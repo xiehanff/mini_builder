@@ -39,6 +39,8 @@ class MiniNotifier extends ChangeNotifier {
   void onClose() {}
 
   void addIdListener(String id, VoidCallback listener) {
+    if (_closed) return;
+
     _idListeners.putIfAbsent(id, () => <VoidCallback>[]).add(listener);
   }
 
@@ -53,14 +55,19 @@ class MiniNotifier extends ChangeNotifier {
   }
 
   /// 通知监听器，支持按 id 细粒度刷新。
-  /// - ids 为 null 或空时，通知全部监听器。
+  /// - ids 为 null 时，通知全部监听器。
+  /// - ids 为空时，不通知任何监听器。
   /// - ids 非空时，仅通知对应 id 的监听器。
   void update([List<String>? ids]) {
-    if (ids == null || ids.isEmpty) {
+    if (_closed) return;
+
+    if (ids == null) {
       super.notifyListeners();
       _notifyAllIdListeners();
       return;
     }
+
+    if (ids.isEmpty) return;
 
     for (final id in ids) {
       _notifyIdListeners(id);

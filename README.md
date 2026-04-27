@@ -2,50 +2,24 @@
 
 `mini_builder` 是一个轻量 Flutter 状态刷新工具，适合页面级 controller、局部刷新和深层 controller 注入。
 
-它只解决三件事：
+## 特性
 
 - `MiniNotifier`：controller 基类，提供生命周期、全量刷新和按 id 局部刷新。
-- `MiniBuilder`：订阅 controller，并按需重建当前 Widget。
+- `MiniBuilder`：订阅 controller，并按需重建当前 Widget，支持 `id` 和 `shouldRebuild`。
 - `MiniProvider`：把 controller 注入到子树，避免层层传参。
-
-它不是完整状态管理框架，不负责路由、依赖自动创建、全局状态、缓存同步或副作用队列。
-
-## 设计思想
-
-**保留了 GetX 的核心优点：**
-
-- **controller 与页面生命周期绑定**：controller 的 `onInit` / `onReady` / `onClose` 与 StatefulWidget 的 `initState` / `postFrameCallback` / `dispose` 对齐，业务逻辑收敛在 controller 中，页面只负责创建和销毁。
-- **GetBuilder 风格的细粒度刷新**：通过 `update([id])` 按 id 通知局部区域，避免整页重建，和 GetX 的 `update(['id'])` 完全一致。
-- **深层注入**：通过 `MiniProvider` 让任意子组件访问 controller，避免层层 props 穿透。
-- **单例 / Manager 模式友好**：controller 可以是单例，也可以是页面级实例，生命周期完全由页面掌控。
-
-**摒弃了什么：**
-- **全局状态和依赖自动创建**：屏蔽了`Get.put` / `Get.find`, 全局单例过多会导致状态难以追踪，依赖自动创建则让隐式耦合蔓延。mini_builder 选择显式创建、页面持有。
-
-### 原生 ChangeNotifier 的区别
-
-Flutter 原生提供了两种基于 `Listenable` 的订阅重建方式：`ListenableBuilder` 和 `ValueListenableBuilder`。
-
-| | ChangeNotifier + `ListenableBuilder` | `ValueListenableBuilder<T>` | MiniBuilder |
-|---|---|---|---|
-| 适用对象 | 任意 `Listenable`（含自定义） | 必须是 `ValueListenable<T>`（如 `ValueNotifier<T>`） | 仅限 `MiniNotifier` |
-| 生命周期 | 需手动在 StatefulWidget 中管理 init/dispose | 需手动在 StatefulWidget 中管理 | controller 自带 `onInit`/`onReady`/`onClose`，与页面生命周期对齐 |
-| 依赖注入 | 需自行实现或手动传递 | 需自行实现或手动传递 | `MiniProvider` 内置深层注入 |
-| 按 id 局部刷新 | 不支持 | 不支持 | 支持 |
-| 重建条件 | 无 | 无 | `shouldRebuild` 可按业务条件跳过重建 |
-| 侵入性 | 仅继承 `ChangeNotifier`，无模板负担 | 仅实现 `ValueListenable<T>`，无模板负担 | 仅需继承 `MiniNotifier`，无额外模板 |
-
-本质上，`MiniNotifier = ChangeNotifier + 生命周期管理 + 按 id 分发`，`MiniBuilder = 支持按 id 分发的 ListenableBuilder`，同时借鉴了 GetX 的简洁风格。
+- 适合页面级状态、局部刷新和深层 controller 共享。
 
 ## 安装
 
-内部 package 使用 path 依赖：
+本地开发时，在 `pubspec.yaml` 中通过 path 依赖引入：
 
 ```yaml
 dependencies:
   mini_builder:
-    path: packages/mini_builder
+    path: ../mini_builder
 ```
+
+按你的实际项目路径调整 `path` 即可。
 
 业务代码统一导入：
 
@@ -110,7 +84,7 @@ class _CounterPageState extends State<CounterPage> {
 }
 ```
 
-## MiniNotifier 生命周期
+## 生命周期
 
 `MiniNotifier` 提供轻量生命周期：
 
@@ -125,13 +99,13 @@ class ProductController extends MiniNotifier {
   @override
   void onReady() {
     super.onReady();
-    // 第一帧后可执行的非 context 逻辑。
+    // 第一帧后执行的补充初始化或收尾逻辑。
   }
 
   @override
   void onClose() {
     super.onClose();
-    // 释放 timer、stream、cancel token、animation 之外的业务资源。
+    // 释放 timer、stream subscription、cancel token 等资源。
   }
 }
 ```
@@ -173,21 +147,10 @@ void initState() {
 - `ready()` 只触发一次 `onReady()`，需页面自行调度。
 - `dispose()` 只触发一次 `onClose()`。
 - `MiniBuilder` 不会自动调用 `init()`、`ready()` 或 `dispose()`。
+- `update([])` 不会触发任何监听器。
+- `update()` 会通知普通 `addListener` 监听器和所有通过 `id` 订阅的 `MiniBuilder`。
+- `update([id])` 只会通知对应 `id` 的 `MiniBuilder`，不会通知普通 `addListener`。
 - controller 不建议持有 `BuildContext`。
-
-## 全量刷新
-
-```dart
-void increaseAll() {
-  count++;
-  update();
-}
-```
-
-`update()` 会通知：
-
-- 普通 `addListener` 监听器。
-- 所有通过 `id` 订阅的 `MiniBuilder`。
 
 ## 按 id 局部刷新
 
@@ -212,8 +175,6 @@ MiniBuilder<ProductController>(
   },
 )
 ```
-
-`update([id])` 只会通知对应 id 的 `MiniBuilder`，不会通知普通 `addListener`。
 
 ## shouldRebuild
 
@@ -348,34 +309,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
 旧页面和新页面分别处在不同路由子树中，相同类型 controller 不会互相覆盖。
 
-## 业务逻辑放在哪里
-
-推荐边界：
-
-- controller：网络请求、状态流转、数据校验、缓存字段、资源释放。
-- page `State`：路由、弹窗、Snackbar、Overlay、滚动、焦点、骨架屏移除后的 UI 编排。
-- widget：纯展示和事件转发。
-
-提交后跳转示例：
-
-```dart
-Future<void> _handleSubmit() async {
-  final order = await controller.submit();
-  if (!mounted || order == null) return;
-
-  await WidgetsBinding.instance.endOfFrame;
-  if (!mounted) return;
-
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => OrderDetailPage(order: order),
-    ),
-  );
-}
-```
-
-不要在 `MiniBuilder.builder` 里做路由、弹窗、`setState` 这类副作用。
-
 ## 能力边界
 
 适合：
@@ -394,41 +327,3 @@ Future<void> _handleSubmit() async {
 - 路由守卫和中间件。
 - 副作用队列。
 - 数据缓存同步和离线策略。
-
-## 示例
-
-宿主工程的示例页面直接使用本 package：
-
-```text
-lib/
-└── mini_builder_example_page.dart
-```
-
-宿主工程通过 path dependency 引用本 package：
-
-```yaml
-dependencies:
-  mini_builder:
-    path: packages/mini_builder
-```
-
-## 测试注意
-
-直接测试 `Text` 时需要 `Directionality`、`WidgetsApp` 或 `MaterialApp`：
-
-```dart
-await tester.pumpWidget(
-  Directionality(
-    textDirection: TextDirection.ltr,
-    child: Text('0'),
-  ),
-);
-```
-
-测试滚动列表底部按钮时，先确保目标可见：
-
-```dart
-await tester.ensureVisible(find.text('提交'));
-await tester.pumpAndSettle();
-await tester.tap(find.text('提交'));
-```

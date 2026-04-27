@@ -42,6 +42,39 @@ void main() {
     expect(idNotifyCount, 0);
   });
 
+  test('update after dispose is a no-op', () {
+    final controller = _LifecycleController();
+    var globalNotifyCount = 0;
+    var idNotifyCount = 0;
+
+    controller.addListener(() {
+      globalNotifyCount++;
+    });
+    controller.addIdListener('red', () {
+      idNotifyCount++;
+    });
+
+    controller.dispose();
+    controller.update();
+    controller.update(['red']);
+
+    expect(globalNotifyCount, 0);
+    expect(idNotifyCount, 0);
+  });
+
+  test('addIdListener after dispose is a no-op', () {
+    final controller = _LifecycleController();
+    var idNotifyCount = 0;
+
+    controller.dispose();
+    controller.addIdListener('red', () {
+      idNotifyCount++;
+    });
+    controller.update(['red']);
+
+    expect(idNotifyCount, 0);
+  });
+
   test('update notifies global and id listeners', () {
     final controller = _LifecycleController();
     var globalNotifyCount = 0;
@@ -67,6 +100,26 @@ void main() {
     controller.dispose();
   });
 
+  test('update with empty ids does not notify listeners', () {
+    final controller = _LifecycleController();
+    var globalNotifyCount = 0;
+    var redNotifyCount = 0;
+
+    controller.addListener(() {
+      globalNotifyCount++;
+    });
+    controller.addIdListener('red', () {
+      redNotifyCount++;
+    });
+
+    controller.update([]);
+
+    expect(globalNotifyCount, 0);
+    expect(redNotifyCount, 0);
+
+    controller.dispose();
+  });
+
   test('update with id only notifies matching id listeners', () {
     final controller = _LifecycleController();
     var globalNotifyCount = 0;
@@ -88,6 +141,42 @@ void main() {
     expect(globalNotifyCount, 0);
     expect(redNotifyCount, 1);
     expect(blueNotifyCount, 0);
+
+    controller.dispose();
+  });
+
+  test('update with nonexistent id is a no-op', () {
+    final controller = _LifecycleController();
+    var redNotifyCount = 0;
+
+    controller.addIdListener('red', () {
+      redNotifyCount++;
+    });
+
+    controller.update(['blue']);
+
+    expect(redNotifyCount, 0);
+
+    controller.dispose();
+  });
+
+  test('same id listener can be registered and removed independently', () {
+    final controller = _LifecycleController();
+    var notifyCount = 0;
+
+    void listener() {
+      notifyCount++;
+    }
+
+    controller.addIdListener('red', listener);
+    controller.addIdListener('red', listener);
+
+    controller.update(['red']);
+    expect(notifyCount, 2);
+
+    controller.removeIdListener('red', listener);
+    controller.update(['red']);
+    expect(notifyCount, 3);
 
     controller.dispose();
   });

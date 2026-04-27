@@ -164,6 +164,48 @@ void main() {
 
     controller.dispose();
   });
+
+  testWidgets('MiniBuilder skips subscription for disposed controller', (
+    tester,
+  ) async {
+    final controller = _TestController()..dispose();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MiniBuilder<_TestController>(
+          controller: controller,
+          builder: (context, controller) {
+            return Text('${controller.count}');
+          },
+        ),
+      ),
+    );
+
+    expect(find.text('0'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('MiniBuilder can unmount after controller is disposed', (
+    tester,
+  ) async {
+    final controller = _TestController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MiniBuilder<_TestController>(
+          controller: controller,
+          builder: (context, controller) {
+            return Text('${controller.count}');
+          },
+        ),
+      ),
+    );
+
+    controller.dispose();
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _TestController extends MiniNotifier {

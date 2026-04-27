@@ -49,6 +49,8 @@ class _MiniBuilderState<T extends MiniNotifier> extends State<MiniBuilder<T>> {
   }
 
   void _subscribe() {
+    if (widget.controller.closed) return;
+
     final id = widget.id;
     if (id == null) {
       widget.controller.addListener(_listener);
