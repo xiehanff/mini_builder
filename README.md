@@ -52,11 +52,6 @@ class _CounterPageState extends State<CounterPage> {
   void initState() {
     super.initState();
     controller = CounterController()..init();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      controller.ready();
-    });
   }
 
   @override
@@ -121,11 +116,6 @@ class ProductController extends MiniNotifier {
 void initState() {
   super.initState();
   controller = ProductController(productId)..init();
-
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!mounted) return;
-    controller.ready();
-  });
 }
 
 @override
@@ -135,10 +125,25 @@ void dispose() {
 }
 ```
 
+如需在第一帧渲染后执行逻辑，可在 `initState` 中调度 `ready()`：
+
+```dart
+@override
+void initState() {
+  super.initState();
+  controller = ProductController(productId)..init();
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!mounted) return;
+    controller.ready();
+  });
+}
+```
+
 ### 生命周期边界
 
 - `init()` 只触发一次 `onInit()`。
-- `ready()` 只触发一次 `onReady()`。
+- `ready()` 只触发一次 `onReady()`，需页面自行调度。
 - `dispose()` 只触发一次 `onClose()`。
 - `MiniBuilder` 不会自动调用 `init()`、`ready()` 或 `dispose()`。
 - controller 不建议持有 `BuildContext`。
