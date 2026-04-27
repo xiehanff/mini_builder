@@ -12,8 +12,6 @@
 
 ## 设计思想
 
-### GetX 学到了什么
-
 **保留了 GetX 的核心优点：**
 
 - **controller 与页面生命周期绑定**：controller 的 `onInit` / `onReady` / `onClose` 与 StatefulWidget 的 `initState` / `postFrameCallback` / `dispose` 对齐，业务逻辑收敛在 controller 中，页面只负责创建和销毁。
@@ -21,24 +19,23 @@
 - **深层注入**：通过 `MiniProvider` 让任意子组件访问 controller，避免层层 props 穿透。
 - **单例 / Manager 模式友好**：controller 可以是单例，也可以是页面级实例，生命周期完全由页面掌控。
 
-**摒弃了什么（GetX 的过度设计）：**
-
-- **路由守卫和中间件**：路由相关逻辑应由专门的导航层处理，不该混入状态管理。
-- **全局状态和依赖自动创建**：全局单例过多会导致状态难以追踪，依赖自动创建则让隐式耦合蔓延。mini_builder 选择显式创建、页面持有。
-- **副作用队列和异步拦截**：复杂异步编排应使用专门的流程控制，状态管理不该越界。
-- **GetX 自身的学习成本**：响应式语法（Obx）、Workers（ever/once/debounce）等对简单页面过于复杂，mini_builder 只保留最直接的状态订阅。
+**摒弃了什么：**
+- **全局状态和依赖自动创建**：屏蔽了`Get.put` / `Get.find`, 全局单例过多会导致状态难以追踪，依赖自动创建则让隐式耦合蔓延。mini_builder 选择显式创建、页面持有。
 
 ### 原生 ChangeNotifier 的区别
 
-| | ChangeNotifier + Consumer / ListenableBuilder | MiniBuilder |
-|---|---|---|
-| 局部刷新 | 只能全量重建 | 支持按 `id` 细粒度局部重建 |
-| 生命周期 | 需手动在 StatefulWidget 中管理 init/dispose | controller 自带 `onInit`/`onReady`/`onClose`，与页面生命周期对齐 |
-| 依赖注入 | 需自行实现 Provider 或手动传递 | `MiniProvider` 内置深层注入 |
-| 重建条件 | 无 | `shouldRebuild` 可按业务条件跳过重建 |
-| 侵入性 | 依赖 `ChangeNotifierProvider` | 仅需继承 `MiniNotifier`，无需 Provider 模板 |
+Flutter 原生提供了两种基于 `Listenable` 的订阅重建方式：`ListenableBuilder` 和 `ValueListenableBuilder`。
 
-本质上，`MiniNotifier = ChangeNotifier + 生命周期管理 + 按 id 分发`，`MiniBuilder = Consumer 的 Flutter 原生替代`，同时保留了 GetX 的简洁风格。
+| | ChangeNotifier + `ListenableBuilder` | `ValueListenableBuilder<T>` | MiniBuilder |
+|---|---|---|---|
+| 适用对象 | 任意 `Listenable`（含自定义） | 必须是 `ValueListenable<T>`（如 `ValueNotifier<T>`） | 仅限 `MiniNotifier` |
+| 局部刷新 | 只能全量重建 | 只能全量重建 | 支持按 `id` 细粒度局部重建 |
+| 生命周期 | 需手动在 StatefulWidget 中管理 init/dispose | 需手动在 StatefulWidget 中管理 | controller 自带 `onInit`/`onReady`/`onClose`，与页面生命周期对齐 |
+| 依赖注入 | 需自行实现或手动传递 | 需自行实现或手动传递 | `MiniProvider` 内置深层注入 |
+| 重建条件 | 无 | 无 | `shouldRebuild` 可按业务条件跳过重建 |
+| 侵入性 | 仅继承 `ChangeNotifier`，无模板负担 | 仅实现 `ValueListenable<T>`，无模板负担 | 仅需继承 `MiniNotifier`，无额外模板 |
+
+本质上，`MiniNotifier = ChangeNotifier + 生命周期管理 + 按 id 分发`，`MiniBuilder = 支持按 id 分发的 ListenableBuilder`，同时借鉴了 GetX 的简洁风格。
 
 ## 安装
 
