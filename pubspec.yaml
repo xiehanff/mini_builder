@@ -1,0 +1,19 @@
+name: mini_builder
+description: A lightweight Flutter controller, provider, and builder package for page-scoped state and fine-grained rebuilds.
+version: 0.1.0
+homepage: https://github.com/YOUR_USERNAME/mini_builder
+repository: https://github.com/YOUR_USERNAME/mini_builder.git
+issue_tracker: https://github.com/YOUR_USERNAME/mini_builder/issues
+
+environment:
+  sdk: ^3.5.4
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0

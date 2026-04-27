@@ -1,0 +1,96 @@
+import 'package:flutter/foundation.dart';
+
+class MiniNotifier extends ChangeNotifier {
+  final Map<String, List<VoidCallback>> _idListeners = {};
+  bool _initialized = false;
+  bool _readyCalled = false;
+  bool _closed = false;
+
+  bool get initialized => _initialized;
+
+  bool get readyCalled => _readyCalled;
+
+  bool get closed => _closed;
+
+  void init() {
+    if (_initialized) return;
+
+    _initialized = true;
+    onInit();
+  }
+
+  void ready() {
+    if (_readyCalled) return;
+
+    _readyCalled = true;
+    onReady();
+  }
+
+  @protected
+  @mustCallSuper
+  void onInit() {}
+
+  @protected
+  @mustCallSuper
+  void onReady() {}
+
+  @protected
+  @mustCallSuper
+  void onClose() {}
+
+  void addIdListener(String id, VoidCallback listener) {
+    _idListeners.putIfAbsent(id, () => <VoidCallback>[]).add(listener);
+  }
+
+  void removeIdListener(String id, VoidCallback listener) {
+    final listeners = _idListeners[id];
+    if (listeners == null) return;
+
+    listeners.remove(listener);
+    if (listeners.isEmpty) {
+      _idListeners.remove(id);
+    }
+  }
+
+  /// 通知监听器，支持按 id 细粒度刷新。
+  /// - ids 为 null 或空时，通知全部监听器。
+  /// - ids 非空时，仅通知对应 id 的监听器。
+  void update([List<String>? ids]) {
+    if (ids == null || ids.isEmpty) {
+      super.notifyListeners();
+      _notifyAllIdListeners();
+      return;
+    }
+
+    for (final id in ids) {
+      _notifyIdListeners(id);
+    }
+  }
+
+  void _notifyAllIdListeners() {
+    for (final id in List<String>.of(_idListeners.keys)) {
+      _notifyIdListeners(id);
+    }
+  }
+
+  void _notifyIdListeners(String id) {
+    final listeners = _idListeners[id];
+    if (listeners == null || listeners.isEmpty) return;
+
+    for (final fn in List<VoidCallback>.of(listeners)) {
+      if (_idListeners[id]?.contains(fn) ?? false) {
+        fn();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_closed) return;
+
+    _closed = true;
+    onClose();
+    _idListeners.clear();
+    super.dispose();
+  }
+}

@@ -1,0 +1,21 @@
+name: mini_builder_example
+description: Example app for the mini_builder package.
+publish_to: 'none'
+
+environment:
+  sdk: ^3.5.4
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  mini_builder:
+    path: ../
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
