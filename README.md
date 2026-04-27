@@ -29,9 +29,9 @@ Flutter 原生提供了两种基于 `Listenable` 的订阅重建方式：`Listen
 | | ChangeNotifier + `ListenableBuilder` | `ValueListenableBuilder<T>` | MiniBuilder |
 |---|---|---|---|
 | 适用对象 | 任意 `Listenable`（含自定义） | 必须是 `ValueListenable<T>`（如 `ValueNotifier<T>`） | 仅限 `MiniNotifier` |
-| 局部刷新 | 只能全量重建 | 只能全量重建 | 支持按 `id` 细粒度局部重建 |
 | 生命周期 | 需手动在 StatefulWidget 中管理 init/dispose | 需手动在 StatefulWidget 中管理 | controller 自带 `onInit`/`onReady`/`onClose`，与页面生命周期对齐 |
 | 依赖注入 | 需自行实现或手动传递 | 需自行实现或手动传递 | `MiniProvider` 内置深层注入 |
+| 按 id 局部刷新 | 不支持 | 不支持 | 支持 |
 | 重建条件 | 无 | 无 | `shouldRebuild` 可按业务条件跳过重建 |
 | 侵入性 | 仅继承 `ChangeNotifier`，无模板负担 | 仅实现 `ValueListenable<T>`，无模板负担 | 仅需继承 `MiniNotifier`，无额外模板 |
 
