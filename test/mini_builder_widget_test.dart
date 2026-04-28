@@ -210,6 +210,34 @@ void main() {
     controller.dispose();
   });
 
+  testWidgets('switching id does not repeat lifecycle callbacks', (
+    tester,
+  ) async {
+    final controller = _TestController();
+    final hostKey = GlobalKey<_MiniBuilderHostState>();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: _MiniBuilderHost(
+          key: hostKey,
+          controller: controller,
+          id: 'red',
+        ),
+      ),
+    );
+
+    expect(controller.initCount, 1);
+    expect(controller.readyCount, 1);
+
+    hostKey.currentState!.updateId('blue');
+    await tester.pump();
+
+    expect(controller.initCount, 1);
+    expect(controller.readyCount, 1);
+
+    controller.dispose();
+  });
+
   testWidgets('shouldRebuild controls rebuild timing', (tester) async {
     final controller = _TestController();
     var buildCount = 0;
@@ -322,6 +350,7 @@ void main() {
 class _TestController extends MiniNotifier {
   int count = 0;
   bool disposed = false;
+  int initCount = 0;
   int readyCount = 0;
 
   void increase() {
@@ -338,6 +367,12 @@ class _TestController extends MiniNotifier {
   void dispose() {
     disposed = true;
     super.dispose();
+  }
+
+  @override
+  void onInit() {
+    super.onInit();
+    initCount++;
   }
 
   @override

@@ -33,17 +33,18 @@ class _MiniBuilderState<T extends MiniNotifier> extends State<MiniBuilder<T>> {
   @override
   void didUpdateWidget(covariant MiniBuilder<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.controller == widget.controller &&
-        oldWidget.id == widget.id) {
+    if (oldWidget.controller != widget.controller) {
+      _unsubscribe(oldWidget.controller, oldWidget.id);
+      widget.controller._init();
+      _subscribe();
+      _scheduleReady(widget.controller);
       return;
     }
 
-    _unsubscribe(oldWidget.controller, oldWidget.id);
-    widget.controller._init();
+    if (oldWidget.id == widget.id) return;
+
+    _unsubscribe(widget.controller, oldWidget.id);
     _subscribe();
-    if (oldWidget.controller != widget.controller) {
-      _scheduleReady(widget.controller);
-    }
   }
 
   @override
