@@ -58,6 +58,52 @@ void main() {
     controller.dispose();
   });
 
+  testWidgets('MiniBuilder prints onReady debug log once', (tester) async {
+    final logs = <String>[];
+    final previousDebugPrint = debugPrint;
+    debugPrint = (String? message, {int? wrapWidth}) {
+      if (message == null) return;
+
+      logs.add(message);
+    };
+
+    try {
+      final controller = _TestController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MiniBuilder<_TestController>(
+            controller: controller,
+            builder: (context, controller) {
+              return Text('${controller.count}');
+            },
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MiniBuilder<_TestController>(
+            controller: controller,
+            builder: (context, controller) {
+              return Text('${controller.count}');
+            },
+          ),
+        ),
+      );
+
+      controller.dispose();
+
+      expect(logs, <String>[
+        '[mini_builder] _TestController.onInit',
+        '[mini_builder] _TestController.onReady',
+        '[mini_builder] _TestController.onClose',
+      ]);
+    } finally {
+      debugPrint = previousDebugPrint;
+    }
+  });
+
   testWidgets('multiple MiniBuilders call onReady only once', (tester) async {
     final controller = _TestController();
 

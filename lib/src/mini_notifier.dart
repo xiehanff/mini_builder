@@ -20,6 +20,7 @@ class MiniNotifier extends ChangeNotifier {
     if (_closed || _initialized) return;
 
     _initialized = true;
+    _logLifecycle('onInit');
     onInit();
   }
 
@@ -27,6 +28,7 @@ class MiniNotifier extends ChangeNotifier {
     if (_closed || !_initialized || _readyCalled) return;
 
     _readyCalled = true;
+    _logLifecycle('onReady');
     onReady();
   }
 
@@ -41,6 +43,12 @@ class MiniNotifier extends ChangeNotifier {
   @protected
   @mustCallSuper
   void onClose() {}
+
+  void _logLifecycle(String name) {
+    if (kReleaseMode) return;
+
+    debugPrint('[mini_builder] $runtimeType.$name');
+  }
 
   void addIdListener(String id, VoidCallback listener) {
     if (_closed) return;
@@ -100,6 +108,7 @@ class MiniNotifier extends ChangeNotifier {
     if (_closed) return;
 
     _closed = true;
+    _logLifecycle('onClose');
     onClose();
     _idListeners.clear();
     super.dispose();

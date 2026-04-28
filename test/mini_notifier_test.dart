@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mini_builder/mini_builder.dart';
 
@@ -25,6 +26,30 @@ void main() {
     expect(controller.closed, isTrue);
     expect(controller.onCloseCount, 1);
     expect(idNotifyCount, 0);
+  });
+
+  test('lifecycle hooks print debug logs once', () {
+    final logs = <String>[];
+    final previousDebugPrint = debugPrint;
+    debugPrint = (String? message, {int? wrapWidth}) {
+      if (message == null) return;
+
+      logs.add(message);
+    };
+
+    try {
+      final controller = _LifecycleController();
+
+      controller.dispose();
+      controller.dispose();
+
+      expect(logs, <String>[
+        '[mini_builder] _LifecycleController.onInit',
+        '[mini_builder] _LifecycleController.onClose',
+      ]);
+    } finally {
+      debugPrint = previousDebugPrint;
+    }
   });
 
   test('update after dispose is a no-op', () {

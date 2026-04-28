@@ -134,6 +134,7 @@ void dispose() {
 - 持有 controller 的页面或封装需要负责创建和释放 controller。
 - controller 构造时会自动触发 `onInit()`。
 - `MiniBuilder` 会在首帧渲染后自动触发 `onReady()`。
+- 生命周期钩子触发时会在非 release 模式下打印调试日志，release 模式不输出。
 - `update([])` 不会触发任何监听器。
 - `update()` 会通知普通 `addListener` 监听器和所有通过 `id` 订阅的 `MiniBuilder`。
 - `update([id])` 只会通知对应 `id` 的 `MiniBuilder`，不会通知普通 `addListener`。
