@@ -1,5 +1,7 @@
 library mini_builder;
 
-export 'src/mini_builder_widget.dart';
-export 'src/mini_notifier.dart';
-export 'src/mini_provider.dart';
+import 'package:flutter/material.dart';
+
+part 'src/mini_builder_widget.dart';
+part 'src/mini_notifier.dart';
+part 'src/mini_provider.dart';

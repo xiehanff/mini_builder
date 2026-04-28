@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+part of '../mini_builder.dart';
 
 class MiniNotifier extends ChangeNotifier {
   final Map<String, List<VoidCallback>> _idListeners = {};
@@ -12,15 +12,19 @@ class MiniNotifier extends ChangeNotifier {
 
   bool get closed => _closed;
 
-  void init() {
-    if (_initialized) return;
+  MiniNotifier() {
+    _init();
+  }
+
+  void _init() {
+    if (_closed || _initialized) return;
 
     _initialized = true;
     onInit();
   }
 
-  void ready() {
-    if (_readyCalled) return;
+  void _ready() {
+    if (_closed || !_initialized || _readyCalled) return;
 
     _readyCalled = true;
     onReady();

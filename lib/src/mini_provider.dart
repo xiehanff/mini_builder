@@ -1,6 +1,4 @@
-import 'package:flutter/widgets.dart';
-
-import 'mini_notifier.dart';
+part of '../mini_builder.dart';
 
 class MiniProvider<T extends MiniNotifier> extends InheritedWidget {
   final T controller;

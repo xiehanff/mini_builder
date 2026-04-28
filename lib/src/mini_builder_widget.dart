@@ -1,6 +1,4 @@
-import 'package:flutter/material.dart';
-
-import 'mini_notifier.dart';
+part of '../mini_builder.dart';
 
 class MiniBuilder<T extends MiniNotifier> extends StatefulWidget {
   final T controller;
@@ -28,6 +26,7 @@ class _MiniBuilderState<T extends MiniNotifier> extends State<MiniBuilder<T>> {
     super.initState();
     _listener = _handleUpdate;
     _subscribe();
+    _scheduleReady(widget.controller);
   }
 
   @override
@@ -40,6 +39,9 @@ class _MiniBuilderState<T extends MiniNotifier> extends State<MiniBuilder<T>> {
 
     _unsubscribe(oldWidget.controller, oldWidget.id);
     _subscribe();
+    if (oldWidget.controller != widget.controller) {
+      _scheduleReady(widget.controller);
+    }
   }
 
   @override
@@ -58,6 +60,14 @@ class _MiniBuilderState<T extends MiniNotifier> extends State<MiniBuilder<T>> {
     }
 
     widget.controller.addIdListener(id, _listener);
+  }
+
+  void _scheduleReady(T controller) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || widget.controller != controller) return;
+
+      controller._ready();
+    });
   }
 
   void _unsubscribe(MiniNotifier controller, String? id) {

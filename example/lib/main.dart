@@ -373,12 +373,7 @@ class _ProductDetailDemoState extends State<ProductDetailDemo> {
   @override
   void initState() {
     super.initState();
-    _controller = ProductDetailController(widget.productId)..init();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _controller.ready();
-    });
+    _controller = ProductDetailController(widget.productId);
   }
 
   @override

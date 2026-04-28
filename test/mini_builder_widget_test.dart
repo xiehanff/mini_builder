@@ -23,6 +23,71 @@ void main() {
     controller.dispose();
   });
 
+  testWidgets('MiniBuilder calls onReady once after first frame', (
+    tester,
+  ) async {
+    final controller = _TestController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MiniBuilder<_TestController>(
+          controller: controller,
+          builder: (context, controller) {
+            return Text('${controller.count}');
+          },
+        ),
+      ),
+    );
+
+    expect(controller.readyCalled, isTrue);
+    expect(controller.readyCount, 1);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MiniBuilder<_TestController>(
+          controller: controller,
+          builder: (context, controller) {
+            return Text('${controller.count}');
+          },
+        ),
+      ),
+    );
+
+    expect(controller.readyCount, 1);
+
+    controller.dispose();
+  });
+
+  testWidgets('multiple MiniBuilders call onReady only once', (tester) async {
+    final controller = _TestController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Column(
+          children: <Widget>[
+            MiniBuilder<_TestController>(
+              controller: controller,
+              builder: (context, controller) {
+                return Text('first ${controller.count}');
+              },
+            ),
+            MiniBuilder<_TestController>(
+              controller: controller,
+              builder: (context, controller) {
+                return Text('second ${controller.count}');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+
+    expect(controller.readyCalled, isTrue);
+    expect(controller.readyCount, 1);
+
+    controller.dispose();
+  });
+
   testWidgets('switching controller unsubscribes the old one', (tester) async {
     final firstController = _TestController();
     final secondController = _TestController();
@@ -211,6 +276,7 @@ void main() {
 class _TestController extends MiniNotifier {
   int count = 0;
   bool disposed = false;
+  int readyCount = 0;
 
   void increase() {
     count++;
@@ -226,6 +292,12 @@ class _TestController extends MiniNotifier {
   void dispose() {
     disposed = true;
     super.dispose();
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    readyCount++;
   }
 }
 

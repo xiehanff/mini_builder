@@ -2,26 +2,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mini_builder/mini_builder.dart';
 
 void main() {
-  test('init calls onInit once', () {
+  test('constructor calls onInit once', () {
     final controller = _LifecycleController();
-
-    controller.init();
-    controller.init();
 
     expect(controller.initialized, isTrue);
     expect(controller.onInitCount, 1);
-
-    controller.dispose();
-  });
-
-  test('ready calls onReady once', () {
-    final controller = _LifecycleController();
-
-    controller.ready();
-    controller.ready();
-
-    expect(controller.readyCalled, isTrue);
-    expect(controller.onReadyCount, 1);
 
     controller.dispose();
   });

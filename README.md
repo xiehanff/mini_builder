@@ -52,7 +52,7 @@ class _CounterPageState extends State<CounterPage> {
   @override
   void initState() {
     super.initState();
-    controller = CounterController()..init();
+    controller = CounterController();
   }
 
   @override
@@ -86,7 +86,7 @@ class _CounterPageState extends State<CounterPage> {
 
 ## 生命周期
 
-`MiniNotifier` 提供轻量生命周期：
+`MiniNotifier` 提供轻量生命周期钩子。业务开发者只需要覆写 `onInit()`、`onReady()` 和 `onClose()`，不要在业务逻辑中主动调用这些钩子：
 
 ```dart
 class ProductController extends MiniNotifier {
@@ -110,13 +110,13 @@ class ProductController extends MiniNotifier {
 }
 ```
 
-页面负责触发生命周期：
+controller 持有方需要负责创建和释放 controller。`onInit()` 会在 controller 构造时自动触发：
 
 ```dart
 @override
 void initState() {
   super.initState();
-  controller = ProductController(productId)..init();
+  controller = ProductController(productId);
 }
 
 @override
@@ -126,27 +126,14 @@ void dispose() {
 }
 ```
 
-如需在第一帧渲染后执行逻辑，可在 `initState` 中调度 `ready()`：
-
-```dart
-@override
-void initState() {
-  super.initState();
-  controller = ProductController(productId)..init();
-
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!mounted) return;
-    controller.ready();
-  });
-}
-```
+如需在第一帧渲染后执行逻辑，请把代码放在 `onReady()` 中。`onReady()` 由 `MiniBuilder` 在首帧后自动触发，业务侧不需要手动调用 ready 入口。
 
 ### 生命周期边界
 
-- `init()` 只触发一次 `onInit()`。
-- `ready()` 只触发一次 `onReady()`，需页面自行调度。
-- `dispose()` 只触发一次 `onClose()`。
-- `MiniBuilder` 不会自动调用 `init()`、`ready()` 或 `dispose()`。
+- `onInit()`、`onReady()` 和 `onClose()` 是给业务开发者覆写的生命周期钩子。
+- 持有 controller 的页面或封装需要负责创建和释放 controller。
+- controller 构造时会自动触发 `onInit()`。
+- `MiniBuilder` 会在首帧渲染后自动触发 `onReady()`。
 - `update([])` 不会触发任何监听器。
 - `update()` 会通知普通 `addListener` 监听器和所有通过 `id` 订阅的 `MiniBuilder`。
 - `update([id])` 只会通知对应 `id` 的 `MiniBuilder`，不会通知普通 `addListener`。
@@ -288,7 +275,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   @override
   void initState() {
     super.initState();
-    controller = ProductController(widget.productId)..init();
+    controller = ProductController(widget.productId);
   }
 
   @override
