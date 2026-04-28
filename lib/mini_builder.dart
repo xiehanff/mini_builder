@@ -1,5 +1,7 @@
 library mini_builder;
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 

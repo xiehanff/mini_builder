@@ -13,7 +13,7 @@ class MiniNotifier extends ChangeNotifier {
   bool get closed => _closed;
 
   MiniNotifier() {
-    _init();
+    scheduleMicrotask(_init);
   }
 
   void _init() {

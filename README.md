@@ -110,7 +110,7 @@ class ProductController extends MiniNotifier {
 }
 ```
 
-controller 持有方需要负责创建和释放 controller。`onInit()` 会在 controller 构造时自动触发：
+controller 持有方需要负责创建和释放 controller。`onInit()` 会在 controller 构造完成后自动触发：
 
 ```dart
 @override
@@ -132,7 +132,7 @@ void dispose() {
 
 - `onInit()`、`onReady()` 和 `onClose()` 是给业务开发者覆写的生命周期钩子。
 - 持有 controller 的页面或封装需要负责创建和释放 controller。
-- controller 构造时会自动触发 `onInit()`。
+- controller 构造完成后会自动触发 `onInit()`。
 - `MiniBuilder` 会在首帧渲染后自动触发 `onReady()`。
 - 生命周期钩子触发时会在非 release 模式下打印调试日志，release 模式不输出。
 - `update([])` 不会触发任何监听器。

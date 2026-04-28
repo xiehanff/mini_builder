@@ -25,6 +25,7 @@ class _MiniBuilderState<T extends MiniNotifier> extends State<MiniBuilder<T>> {
   void initState() {
     super.initState();
     _listener = _handleUpdate;
+    widget.controller._init();
     _subscribe();
     _scheduleReady(widget.controller);
   }
@@ -38,6 +39,7 @@ class _MiniBuilderState<T extends MiniNotifier> extends State<MiniBuilder<T>> {
     }
 
     _unsubscribe(oldWidget.controller, oldWidget.id);
+    widget.controller._init();
     _subscribe();
     if (oldWidget.controller != widget.controller) {
       _scheduleReady(widget.controller);

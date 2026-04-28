@@ -3,11 +3,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mini_builder/mini_builder.dart';
 
 void main() {
-  test('constructor calls onInit once', () {
+  test('constructor schedules onInit once', () async {
     final controller = _LifecycleController();
+
+    expect(controller.initialized, isFalse);
+
+    await pumpEventQueue();
 
     expect(controller.initialized, isTrue);
     expect(controller.onInitCount, 1);
+
+    controller.dispose();
+  });
+
+  test('onInit runs after constructor body', () async {
+    final controller = _ConstructorBodyController('sku-1001');
+
+    await pumpEventQueue();
+
+    expect(controller.initialized, isTrue);
+    expect(controller.initProductId, 'sku-1001');
 
     controller.dispose();
   });
@@ -28,7 +43,7 @@ void main() {
     expect(idNotifyCount, 0);
   });
 
-  test('lifecycle hooks print debug logs once', () {
+  test('lifecycle hooks print debug logs once', () async {
     final logs = <String>[];
     final previousDebugPrint = debugPrint;
     debugPrint = (String? message, {int? wrapWidth}) {
@@ -39,6 +54,8 @@ void main() {
 
     try {
       final controller = _LifecycleController();
+
+      await pumpEventQueue();
 
       controller.dispose();
       controller.dispose();
@@ -237,5 +254,20 @@ class _LifecycleController extends MiniNotifier {
   void onClose() {
     super.onClose();
     onCloseCount++;
+  }
+}
+
+class _ConstructorBodyController extends MiniNotifier {
+  late final String productId;
+  String? initProductId;
+
+  _ConstructorBodyController(String nextProductId) {
+    productId = nextProductId;
+  }
+
+  @override
+  void onInit() {
+    super.onInit();
+    initProductId = productId;
   }
 }
