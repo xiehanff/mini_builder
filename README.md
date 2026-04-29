@@ -1,17 +1,17 @@
 # mini_builder
 
-`mini_builder` 是一个轻量 Flutter 状态刷新工具，适合页面级 controller、局部刷新和深层 controller 注入。
+`mini_builder` is a lightweight Flutter state refresh utility, suitable for page-level controllers, partial refreshes, and deep controller injection.
 
-## 特性
+## Features
 
-- `MiniNotifier`：controller 基类，提供生命周期、全量刷新和按 id 局部刷新。
-- `MiniBuilder`：订阅 controller，并按需重建当前 Widget，支持 `id` 和 `shouldRebuild`。
-- `MiniProvider`：把 controller 注入到子树，避免层层传参。
-- 适合页面级状态、局部刷新和深层 controller 共享。
+- `MiniNotifier`: Base class for controllers, providing lifecycle hooks, full refresh, and per-id partial refresh.
+- `MiniBuilder`: Subscribes to a controller and rebuilds the current Widget on demand, supporting `id` and `shouldRebuild`.
+- `MiniProvider`: Injects a controller into the widget subtree, avoiding prop drilling.
+- Ideal for page-level state, partial refreshes, and deep controller sharing.
 
-## 安装
+## Installation
 
-本地开发时，在 `pubspec.yaml` 中通过 path 依赖引入：
+For local development, add as a path dependency in `pubspec.yaml`:
 
 ```yaml
 dependencies:
@@ -19,15 +19,15 @@ dependencies:
     path: ../mini_builder
 ```
 
-按你的实际项目路径调整 `path` 即可。
+Adjust the `path` according to your actual project structure.
 
-业务代码统一导入：
+Import in business code:
 
 ```dart
 import 'package:mini_builder/mini_builder.dart';
 ```
 
-## 最小示例
+## Minimal Example
 
 ```dart
 class CounterController extends MiniNotifier {
@@ -84,9 +84,9 @@ class _CounterPageState extends State<CounterPage> {
 }
 ```
 
-## 生命周期
+## Lifecycle
 
-`MiniNotifier` 提供轻量生命周期钩子。业务开发者只需要覆写 `onInit()`、`onReady()` 和 `onClose()`，不要在业务逻辑中主动调用这些钩子：
+`MiniNotifier` provides lightweight lifecycle hooks. Business developers only need to override `onInit()`, `onReady()`, and `onClose()`. Do not call these hooks manually in business logic:
 
 ```dart
 class ProductController extends MiniNotifier {
@@ -99,18 +99,18 @@ class ProductController extends MiniNotifier {
   @override
   void onReady() {
     super.onReady();
-    // 第一帧后执行的补充初始化或收尾逻辑。
+    // Supplementary initialization or cleanup logic executed after the first frame.
   }
 
   @override
   void onClose() {
+    // Release resources like timers, stream subscriptions, cancel tokens, etc.
     super.onClose();
-    // 释放 timer、stream subscription、cancel token 等资源。
   }
 }
 ```
 
-controller 持有方需要负责创建和释放 controller。`onInit()` 会在 controller 构造完成后自动触发：
+The controller owner is responsible for creating and disposing the controller. `onInit()` is automatically triggered after the controller is constructed:
 
 ```dart
 @override
@@ -126,21 +126,21 @@ void dispose() {
 }
 ```
 
-如需在第一帧渲染后执行逻辑，请把代码放在 `onReady()` 中。`onReady()` 由 `MiniBuilder` 在首帧后自动触发，业务侧不需要手动调用 ready 入口。
+If you need to execute logic after the first frame renders, place the code in `onReady()`. `onReady()` is automatically triggered by `MiniBuilder` after the first frame. Business code does not need to manually call a ready entry point.
 
-### 生命周期边界
+### Lifecycle Boundaries
 
-- `onInit()`、`onReady()` 和 `onClose()` 是给业务开发者覆写的生命周期钩子。
-- 持有 controller 的页面或封装需要负责创建和释放 controller。
-- controller 构造完成后会自动触发 `onInit()`。
-- `MiniBuilder` 会在首帧渲染后自动触发 `onReady()`。
-- 生命周期钩子触发时会在非 release 模式下打印调试日志，release 模式不输出。
-- `update([])` 不会触发任何监听器。
-- `update()` 会通知普通 `addListener` 监听器和所有通过 `id` 订阅的 `MiniBuilder`。
-- `update([id])` 只会通知对应 `id` 的 `MiniBuilder`，不会通知普通 `addListener`。
-- controller 不建议持有 `BuildContext`。
+- `onInit()`, `onReady()`, and `onClose()` are lifecycle hooks for business developers to override.
+- The page or widget that holds the controller is responsible for creating and disposing it.
+- `onInit()` is automatically triggered after the controller is constructed.
+- `MiniBuilder` automatically triggers `onReady()` after the first frame renders.
+- Lifecycle hooks print debug logs in non-release mode; release mode produces no output.
+- `update([])` does not trigger any listeners.
+- `update()` notifies regular `addListener` listeners and all `MiniBuilder`s subscribed via `id`.
+- `update([id])` only notifies the `MiniBuilder` with the corresponding `id`, not regular `addListener`s.
+- Controllers should not hold `BuildContext`.
 
-## 按 id 局部刷新
+## Partial Refresh by ID
 
 ```dart
 class ProductIds {
@@ -166,7 +166,7 @@ MiniBuilder<ProductController>(
 
 ## shouldRebuild
 
-`shouldRebuild` 用于在 controller 已通知时跳过本次重建：
+`shouldRebuild` is used to skip a rebuild when the controller has already notified:
 
 ```dart
 MiniBuilder<CounterController>(
@@ -178,16 +178,16 @@ MiniBuilder<CounterController>(
 )
 ```
 
-注意：
+Note:
 
-- `shouldRebuild` 只拿到当前 controller。
-- 它不保存旧值，也不比较前后状态。
-- 它适合简单条件，例如只在偶数、指定 tab、数据已准备好时刷新。
-- 如果需要复杂 diff，请在 controller 内维护明确字段。
+- `shouldRebuild` only receives the current controller.
+- It does not save old values or compare previous and current states.
+- It is suitable for simple conditions, such as rebuilding only on even numbers, specific tabs, or when data is ready.
+- If you need complex diffing, maintain explicit fields within the controller.
 
-## MiniProvider 深层注入
+## MiniProvider Deep Injection
 
-页面根部注入：
+Inject at page root:
 
 ```dart
 MiniProvider<ProductController>(
@@ -196,21 +196,21 @@ MiniProvider<ProductController>(
 )
 ```
 
-深层组件读取：
+Read in deep components:
 
 ```dart
 final controller = MiniProvider.of<ProductController>(context);
 ```
 
-可选读取：
+Optional read:
 
 ```dart
 final controller = MiniProvider.maybeOf<ProductController>(context);
 ```
 
-### 多 controller 嵌套
+### Multiple Controller Nesting
 
-不同类型 controller 可以直接嵌套：
+Different controller types can be nested directly:
 
 ```dart
 MiniProvider<UserController>(
@@ -222,14 +222,14 @@ MiniProvider<UserController>(
 )
 ```
 
-分别读取：
+Read separately:
 
 ```dart
 final user = MiniProvider.of<UserController>(context);
 final cart = MiniProvider.of<CartController>(context);
 ```
 
-同类型 controller 嵌套时，`MiniProvider.of<T>()` 会返回最近的那个：
+When nesting controllers of the same type, `MiniProvider.of<T>()` returns the nearest one:
 
 ```dart
 MiniProvider<ProductController>(
@@ -241,11 +241,11 @@ MiniProvider<ProductController>(
 )
 ```
 
-`ProductPanel` 读取到的是 `inner`。如果同一棵子树需要两个同类型 controller，优先改成不同 controller 类型，或显式通过构造参数传入，不建议提前引入 tag 机制。
+`ProductPanel` reads `inner`. If you need two controllers of the same type in the same subtree, prefer refactoring to different controller types or passing explicitly via constructor parameters. Introducing a tag mechanism prematurely is not recommended.
 
-## 商品详情页场景
+## Product Detail Page Scenario
 
-相似商品点击进入新详情页时，通常是新路由、新页面实例、新 controller：
+When clicking on a similar product to enter a new detail page, it is typically a new route, new page instance, new controller:
 
 ```dart
 Navigator.of(context).push(
@@ -255,7 +255,7 @@ Navigator.of(context).push(
 );
 ```
 
-每个详情页自己创建并注入 controller：
+Each detail page creates and injects its own controller:
 
 ```dart
 class ProductDetailPage extends StatefulWidget {
@@ -295,23 +295,23 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 }
 ```
 
-旧页面和新页面分别处在不同路由子树中，相同类型 controller 不会互相覆盖。
+The old page and new page are in different route subtrees, so controllers of the same type will not override each other.
 
-## 能力边界
+## Capability Boundaries
 
-适合：
+Suitable for:
 
-- 页面级状态管理。
-- 表单、详情、列表、设置页。
-- 页面内多个区域共享 controller。
-- 全量刷新和 id 局部刷新。
-- 简单条件重建。
+- Page-level state management.
+- Forms, details, lists, settings pages.
+- Sharing controllers across multiple areas within a page.
+- Full refresh and per-id partial refresh.
+- Simple conditional rebuilding.
 
-不负责：
+Not responsible for:
 
-- 自动依赖注入。
-- 自动创建和销毁 controller。
-- 全局状态管理。
-- 路由守卫和中间件。
-- 副作用队列。
-- 数据缓存同步和离线策略。
+- Automatic dependency injection.
+- Automatic controller creation and disposal.
+- Global state management.
+- Route guards and middleware.
+- Side effect queues.
+- Data cache synchronization and offline strategies.
