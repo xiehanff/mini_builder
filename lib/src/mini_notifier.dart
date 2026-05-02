@@ -13,10 +13,12 @@ class MiniNotifier extends ChangeNotifier {
   bool get closed => _closed;
 
   MiniNotifier() {
-    scheduleMicrotask(_init);
+    // 允许 controller 单独创建时也能自动初始化；
+    // MiniBuilder 也会再次调用 _ensureInitialized()，但这里靠 _initialized 保证幂等。
+    scheduleMicrotask(_ensureInitialized);
   }
 
-  void _init() {
+  void _ensureInitialized() {
     if (_closed || _initialized) return;
 
     _initialized = true;
@@ -97,6 +99,7 @@ class MiniNotifier extends ChangeNotifier {
     if (listeners == null || listeners.isEmpty) return;
 
     for (final fn in List<VoidCallback>.of(listeners)) {
+      // 先拷贝快照避免遍历时修改列表，再跳过本轮已经移除的 listener。
       if (_idListeners[id]?.contains(fn) ?? false) {
         fn();
       }

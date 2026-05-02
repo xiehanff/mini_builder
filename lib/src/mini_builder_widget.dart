@@ -25,7 +25,7 @@ class _MiniBuilderState<T extends MiniNotifier> extends State<MiniBuilder<T>> {
   void initState() {
     super.initState();
     _listener = _handleUpdate;
-    widget.controller._init();
+    widget.controller._ensureInitialized();
     _subscribe();
     _scheduleReady(widget.controller);
   }
@@ -35,7 +35,7 @@ class _MiniBuilderState<T extends MiniNotifier> extends State<MiniBuilder<T>> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
       _unsubscribe(oldWidget.controller, oldWidget.id);
-      widget.controller._init();
+      widget.controller._ensureInitialized();
       _subscribe();
       _scheduleReady(widget.controller);
       return;
@@ -69,6 +69,7 @@ class _MiniBuilderState<T extends MiniNotifier> extends State<MiniBuilder<T>> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || widget.controller != controller) return;
 
+      // onReady 只在 controller 挂到 MiniBuilder 且首帧绘制完成后触发。
       controller._ready();
     });
   }

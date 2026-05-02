@@ -1,3 +1,8 @@
+## 0.2.1
+
+- 重命名 `_init` 为 `_ensureInitialized`，更清晰表达幂等初始化语义。
+- 补充关键设计决策的内联注释：双触发初始化路径、`_notifyIdListeners` 的 contains 守卫、`onReady` 触发约束。
+
 ## 0.2.0
 
 - 修复 `MiniBuilder` 在 controller 切换时未正确触发新 controller 生命周期（`onInit` / `onReady`）的问题。
