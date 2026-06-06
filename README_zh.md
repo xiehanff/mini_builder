@@ -63,21 +63,18 @@ class _CounterPageState extends State<CounterPage> {
 
   @override
   Widget build(BuildContext context) {
-    return MiniProvider<CounterController>(
-      controller: controller,
-      child: Scaffold(
-        body: Center(
-          child: MiniBuilder<CounterController>(
-            controller: controller,
-            builder: (context, controller) {
-              return Text('${controller.count}');
-            },
-          ),
+    return Scaffold(
+      body: Center(
+        child: MiniBuilder<CounterController>(
+          controller: controller,
+          builder: (context, controller) {
+            return Text('${controller.count}');
+          },
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: controller.increase,
-          child: const Icon(Icons.add),
-        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: controller.increase,
+        child: const Icon(Icons.add),
       ),
     );
   }
@@ -186,6 +183,75 @@ MiniBuilder<CounterController>(
 - 如果需要复杂 diff，请在 controller 内维护明确字段。
 
 ## MiniProvider 深层注入
+
+当叶子节点需要访问 controller 时，如果不使用 `MiniProvider`，需要通过每一层构造参数传递：
+
+```dart
+// ❌ 层层传参
+class OrderPage extends StatelessWidget {
+  final OrderController controller;
+  const OrderPage({super.key, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        OrderHeader(controller: controller),       // 传递
+        OrderBody(controller: controller),          // 传递
+        OrderFooter(controller: controller),        // 传递
+      ],
+    );
+  }
+}
+
+class OrderFooter extends StatelessWidget {
+  final OrderController controller;
+  const OrderFooter({super.key, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return MiniBuilder<OrderController>(
+      controller: controller,
+      id: OrderIds.totalPrice,
+      builder: (_, controller) => Text('总价: ${controller.totalPrice}'),
+    );
+  }
+}
+```
+
+使用 `MiniProvider` 在页面根部注入，叶子节点直接取用，中间层无需感知 controller：
+
+```dart
+// ✅ MiniProvider 注入
+class OrderPage extends StatelessWidget {
+  const OrderPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const OrderHeader(),    // 无需传递
+        const OrderBody(),      // 无需传递
+        const OrderFooter(),    // 无需传递
+      ],
+    );
+  }
+}
+
+class OrderFooter extends StatelessWidget {
+  const OrderFooter({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = MiniProvider.of<OrderController>(context);
+    return MiniBuilder<OrderController>(
+      controller: controller,
+      id: OrderIds.totalPrice,
+      builder: (_, controller) => Text('总价: ${controller.totalPrice}'),
+    );
+  }
+}
+```
 
 页面根部注入：
 
@@ -296,6 +362,128 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 ```
 
 旧页面和新页面分别处在不同路由子树中，相同类型 controller 不会互相覆盖。
+
+## 常见误区
+
+### ❌ 在 build 中创建 controller
+
+每次 rebuild 都会创建新实例，导致状态丢失、监听泄漏：
+
+```dart
+// ❌ 错误
+@override
+Widget build(BuildContext context) {
+  final controller = OrderController();  // 每次 rebuild 都会重建
+  return MiniBuilder<OrderController>(controller: controller, ...);
+}
+```
+
+```dart
+// ✅ 正确：在 StatefulWidget 的 createState 中创建
+late final OrderController controller;
+
+@override
+void initState() {
+  super.initState();
+  controller = OrderController();
+}
+
+@override
+void dispose() {
+  controller.dispose();
+  super.dispose();
+}
+```
+
+### ❌ controller 持有 BuildContext
+
+`BuildContext` 持有可能导致内存泄漏和生命周期异常：
+
+```dart
+// ❌ 错误
+class OrderController extends MiniNotifier {
+  BuildContext context;  // 不要这样做
+
+  void load() {
+    Navigator.of(context).push(...);  // 危险
+  }
+}
+```
+
+```dart
+// ✅ 正确：在 Widget 层处理导航等 Context 操作
+class OrderPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MiniBuilder<OrderController>(
+      controller: controller,
+      builder: (_, controller) {
+        return ElevatedButton(
+          onPressed: () => Navigator.of(context).push(...),
+          child: const Text('下一步'),
+        );
+      },
+    );
+  }
+}
+```
+
+### ❌ 在 onInit 中调用 update 通知 UI
+
+`onInit()` 在 controller 构造后立即触发，此时 `MiniBuilder` 尚未订阅，`update()` 不会产生任何刷新：
+
+```dart
+// ❌ 错误
+class OrderController extends MiniNotifier {
+  @override
+  void onInit() {
+    super.onInit();
+    loadOrder();  // 如果内部调了 update()，不会刷新 UI
+  }
+}
+```
+
+```dart
+// ✅ 正确：在 onReady 中通知 UI
+class OrderController extends MiniNotifier {
+  @override
+  void onInit() {
+    super.onInit();
+    loadOrder();  // 发起请求
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    // 首帧后 MiniBuilder 已订阅，此时 update() 可以正常触发刷新
+  }
+}
+```
+
+### ❌ 用 MiniProvider 做跨路由全局共享
+
+`MiniProvider` 注入的是 widget 子树，不是全局单例。跨路由共享应使用全局 controller 或状态管理方案：
+
+```dart
+// ❌ 错误：期望另一个路由的页面能通过 MiniProvider.of 读取到
+Navigator.of(context).push(
+  MaterialPageRoute(builder: (_) => const AnotherPage()),
+);
+// AnotherPage 中 MiniProvider.of<T>(context) 找不到
+```
+
+```dart
+// ✅ 正确：新路由需要自己的 controller 实例
+class AnotherPage extends StatefulWidget {
+  @override
+  State<AnotherPage> createState() => _AnotherPageState();
+}
+
+class _AnotherPageState extends State<AnotherPage> {
+  late final controller = OrderController();
+  // ...
+}
+```
 
 ## 能力边界
 

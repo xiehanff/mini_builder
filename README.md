@@ -65,21 +65,18 @@ class _CounterPageState extends State<CounterPage> {
 
   @override
   Widget build(BuildContext context) {
-    return MiniProvider<CounterController>(
-      controller: controller,
-      child: Scaffold(
-        body: Center(
-          child: MiniBuilder<CounterController>(
-            controller: controller,
-            builder: (context, controller) {
-              return Text('${controller.count}');
-            },
-          ),
+    return Scaffold(
+      body: Center(
+        child: MiniBuilder<CounterController>(
+          controller: controller,
+          builder: (context, controller) {
+            return Text('${controller.count}');
+          },
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: controller.increase,
-          child: const Icon(Icons.add),
-        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: controller.increase,
+        child: const Icon(Icons.add),
       ),
     );
   }
@@ -188,6 +185,75 @@ Note:
 - If you need complex diffing, maintain explicit fields within the controller.
 
 ## MiniProvider Deep Injection
+
+When a leaf node needs access to a controller, without `MiniProvider` you must pass it through every layer of constructor parameters:
+
+```dart
+// ❌ Prop drilling
+class OrderPage extends StatelessWidget {
+  final OrderController controller;
+  const OrderPage({super.key, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        OrderHeader(controller: controller),       // passing through
+        OrderBody(controller: controller),          // passing through
+        OrderFooter(controller: controller),        // passing through
+      ],
+    );
+  }
+}
+
+class OrderFooter extends StatelessWidget {
+  final OrderController controller;
+  const OrderFooter({super.key, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return MiniBuilder<OrderController>(
+      controller: controller,
+      id: OrderIds.totalPrice,
+      builder: (_, controller) => Text('Total: ${controller.totalPrice}'),
+    );
+  }
+}
+```
+
+Using `MiniProvider` at the page root, leaf nodes can access the controller directly — intermediate layers don't need to know about it:
+
+```dart
+// ✅ MiniProvider injection
+class OrderPage extends StatelessWidget {
+  const OrderPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const OrderHeader(),    // no passing needed
+        const OrderBody(),      // no passing needed
+        const OrderFooter(),    // no passing needed
+      ],
+    );
+  }
+}
+
+class OrderFooter extends StatelessWidget {
+  const OrderFooter({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = MiniProvider.of<OrderController>(context);
+    return MiniBuilder<OrderController>(
+      controller: controller,
+      id: OrderIds.totalPrice,
+      builder: (_, controller) => Text('Total: ${controller.totalPrice}'),
+    );
+  }
+}
+```
 
 Inject at page root:
 
@@ -298,6 +364,128 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 ```
 
 The old page and new page are in different route subtrees, so controllers of the same type will not override each other.
+
+## Common Pitfalls
+
+### ❌ Creating a controller in build
+
+Every rebuild creates a new instance, causing state loss and listener leaks:
+
+```dart
+// ❌ Wrong
+@override
+Widget build(BuildContext context) {
+  final controller = OrderController();  // new instance on every rebuild
+  return MiniBuilder<OrderController>(controller: controller, ...);
+}
+```
+
+```dart
+// ✅ Correct: create in StatefulWidget's createState
+late final OrderController controller;
+
+@override
+void initState() {
+  super.initState();
+  controller = OrderController();
+}
+
+@override
+void dispose() {
+  controller.dispose();
+  super.dispose();
+}
+```
+
+### ❌ Controller holding BuildContext
+
+Holding `BuildContext` may cause memory leaks and lifecycle issues:
+
+```dart
+// ❌ Wrong
+class OrderController extends MiniNotifier {
+  BuildContext context;  // don't do this
+
+  void load() {
+    Navigator.of(context).push(...);  // dangerous
+  }
+}
+```
+
+```dart
+// ✅ Correct: handle Context-dependent operations in the Widget layer
+class OrderPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MiniBuilder<OrderController>(
+      controller: controller,
+      builder: (_, controller) {
+        return ElevatedButton(
+          onPressed: () => Navigator.of(context).push(...),
+          child: const Text('Next'),
+        );
+      },
+    );
+  }
+}
+```
+
+### ❌ Calling update to notify UI in onInit
+
+`onInit()` fires right after construction, before `MiniBuilder` has subscribed — `update()` produces no refresh:
+
+```dart
+// ❌ Wrong
+class OrderController extends MiniNotifier {
+  @override
+  void onInit() {
+    super.onInit();
+    loadOrder();  // if this calls update(), UI won't refresh
+  }
+}
+```
+
+```dart
+// ✅ Correct: notify UI in onReady
+class OrderController extends MiniNotifier {
+  @override
+  void onInit() {
+    super.onInit();
+    loadOrder();  // start request
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    // After the first frame MiniBuilder is subscribed; update() works correctly
+  }
+}
+```
+
+### ❌ Using MiniProvider for cross-route global sharing
+
+`MiniProvider` injects into the widget subtree, not a global singleton. For cross-route sharing, use a global controller or state management solution:
+
+```dart
+// ❌ Wrong: expecting another route's page to read via MiniProvider.of
+Navigator.of(context).push(
+  MaterialPageRoute(builder: (_) => const AnotherPage()),
+);
+// AnotherPage won't find MiniProvider.of<T>(context)
+```
+
+```dart
+// ✅ Correct: each route needs its own controller instance
+class AnotherPage extends StatefulWidget {
+  @override
+  State<AnotherPage> createState() => _AnotherPageState();
+}
+
+class _AnotherPageState extends State<AnotherPage> {
+  late final controller = OrderController();
+  // ...
+}
+```
 
 ## Capability Boundaries
 
