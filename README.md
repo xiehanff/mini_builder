@@ -430,37 +430,45 @@ class OrderPage extends StatelessWidget {
 }
 ```
 
-### ❌ Calling update to notify UI in onInit
+### Requesting data and notifying the UI in onInit
 
-`onInit()` fires right after construction, before `MiniBuilder` has subscribed — `update()` produces no refresh:
+You can request data in `onInit()` and call `update()` after the data changes. When `MiniBuilder` triggers initialization, it subscribes first. If the controller was initialized earlier, the first build reads its latest state directly:
 
 ```dart
-// ❌ Wrong
 class OrderController extends MiniNotifier {
+  Order? order;
+  Object? loadError;
+
   @override
-  void onInit() {
+  void onInit() async {
     super.onInit();
-    loadOrder();  // if this calls update(), UI won't refresh
+    late final Order nextOrder;
+    try {
+      nextOrder = await orderApi.fetch();
+    } catch (error) {
+      if (closed) return;
+
+      loadError = error;
+      update();
+      return;
+    }
+    if (closed) return;
+
+    order = nextOrder;
+    update();
   }
 }
 ```
 
-```dart
-// ✅ Correct: notify UI in onReady
-class OrderController extends MiniNotifier {
-  @override
-  void onInit() {
-    super.onInit();
-    loadOrder();  // start request
-  }
+The lifecycle signature of `onInit()` is `void`. Making it `async` does not make the framework await its Future. `onReady()` still runs after the first frame and may run before the API returns. Handle request errors inside `onInit()` instead of relying on the lifecycle caller to catch them.
 
-  @override
-  void onReady() {
-    super.onReady();
-    // After the first frame MiniBuilder is subscribed; update() works correctly
-  }
-}
-```
+`onReady()` remains appropriate for logic that depends on the first rendered frame. Regular API requests do not need to be delayed until `onReady()` just to refresh the UI.
+
+See [`example/lib/on_init_api_example.dart`](example/lib/on_init_api_example.dart) for a runnable example and [`example/test/on_init_api_example_test.dart`](example/test/on_init_api_example_test.dart) for its verification. The example nests `MiniBuilder`s backed by two different controllers. Their subscriptions and notifications are independent, but rebuilding the outer builder still rebuilds its subtree according to Flutter's widget-tree rules.
+
+The example uses [`ExampleLogManager`](example/lib/example_log_manager.dart) for structured debug logs covering request start, success or failure, elapsed time, state updates, and builder rebuild counts. It does not log API payloads or exception messages. Logging is disabled in release mode by default. Enterprise applications should connect an approved sink through `configure()` and apply their environment's redaction and retention policies.
+
+Run the Android example from the `example` directory with `flutter run -d <device-id>`. The generated Android host currently uses a sample application ID and debug signing and is intended only for functional verification. Replace the package name, signing configuration, and CI secret-management setup before an enterprise release.
 
 ### ❌ Using MiniProvider for cross-route global sharing
 

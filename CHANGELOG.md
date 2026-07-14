@@ -1,5 +1,9 @@
 ## 0.2.1
 
+- `MiniBuilder` 触发初始化时会先订阅 controller，支持在 `onInit()` 请求数据后调用 `update()` 刷新页面。
+- example App 增加不同 controller 的嵌套 `MiniBuilder`，两个 controller 都在 `onInit` 请求 API、处理异常并调用 `update()`。
+- README 补充异步 `onInit` 与 `onReady` 的执行顺序，以及嵌套 Builder 的子树重建边界。
+- example App 增加可配置的结构化调试日志和 Android 启动宿主。
 - 重命名 `_init` 为 `_ensureInitialized`，更清晰表达幂等初始化语义。
 - 补充关键设计决策的内联注释：双触发初始化路径、`_notifyIdListeners` 的 contains 守卫、`onReady` 触发约束。
 

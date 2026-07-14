@@ -428,37 +428,45 @@ class OrderPage extends StatelessWidget {
 }
 ```
 
-### ❌ 在 onInit 中调用 update 通知 UI
+### 在 onInit 中请求数据并通知 UI
 
-`onInit()` 在 controller 构造后立即触发，此时 `MiniBuilder` 尚未订阅，`update()` 不会产生任何刷新：
+`onInit()` 可以直接发起 API 请求，并在数据更新后调用 `update()`。如果初始化由 `MiniBuilder` 触发，它会先完成订阅；如果 controller 更早完成初始化，页面首帧会直接读取 controller 的最新状态：
 
 ```dart
-// ❌ 错误
 class OrderController extends MiniNotifier {
+  Order? order;
+  Object? loadError;
+
   @override
-  void onInit() {
+  void onInit() async {
     super.onInit();
-    loadOrder();  // 如果内部调了 update()，不会刷新 UI
+    late final Order nextOrder;
+    try {
+      nextOrder = await orderApi.fetch();
+    } catch (error) {
+      if (closed) return;
+
+      loadError = error;
+      update();
+      return;
+    }
+    if (closed) return;
+
+    order = nextOrder;
+    update();
   }
 }
 ```
 
-```dart
-// ✅ 正确：在 onReady 中通知 UI
-class OrderController extends MiniNotifier {
-  @override
-  void onInit() {
-    super.onInit();
-    loadOrder();  // 发起请求
-  }
+`onInit()` 的生命周期签名是 `void`。写成 `async` 后，框架不会等待其中的 Future；`onReady()` 仍会在首帧后触发，可能早于 API 返回。请求异常需要在 `onInit()` 内处理，不能依赖生命周期调用方捕获。
 
-  @override
-  void onReady() {
-    super.onReady();
-    // 首帧后 MiniBuilder 已订阅，此时 update() 可以正常触发刷新
-  }
-}
-```
+`onReady()` 仍适合依赖首帧渲染结果的逻辑，不需要为了刷新页面把普通 API 请求延后到 `onReady()`。
+
+可运行示例见 [`example/lib/on_init_api_example.dart`](example/lib/on_init_api_example.dart)，对应验证见 [`example/test/on_init_api_example_test.dart`](example/test/on_init_api_example_test.dart)。示例包含两个不同 controller 的嵌套 `MiniBuilder`。两个 controller 的订阅和通知彼此独立，但外层 Builder 重建时，内层仍会遵循 Flutter 的子树重建规则。
+
+example 通过 [`ExampleLogManager`](example/lib/example_log_manager.dart) 输出结构化调试日志，包括请求开始、成功或失败、耗时、状态刷新和 Builder 重建次数。日志不记录 API 返回内容和异常消息。默认只在非 release 模式输出；企业应用应通过 `configure()` 接入经过审批的日志采集器，并按所在环境的脱敏和留存策略处理。
+
+Android 示例可在 `example` 目录执行 `flutter run -d <device-id>` 启动。当前 Android 宿主使用示例 applicationId 和 debug 签名，仅用于功能验证；接入企业发布流程前必须替换为正式包名、签名配置和对应的 CI 密钥管理方案。
 
 ### ❌ 用 MiniProvider 做跨路由全局共享
 
