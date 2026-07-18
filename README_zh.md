@@ -107,7 +107,7 @@ class ProductController extends MiniNotifier {
 }
 ```
 
-controller 持有方需要负责创建和释放 controller。`onInit()` 会在 controller 构造完成后自动触发：
+controller 持有方需要负责创建和释放 controller。controller 构造完成后会通过 microtask 安排初始化；如果它先挂载到 `MiniBuilder`，则由 `MiniBuilder` 在完成订阅后触发初始化。两条路径共享幂等保护，因此 `onInit()` 只会执行一次：
 
 ```dart
 @override
@@ -129,7 +129,7 @@ void dispose() {
 
 - `onInit()`、`onReady()` 和 `onClose()` 是给业务开发者覆写的生命周期钩子。
 - 持有 controller 的页面或封装需要负责创建和释放 controller。
-- controller 构造完成后会自动触发 `onInit()`。
+- controller 构造后，由预定的 microtask 或首个挂载的 `MiniBuilder` 率先触发初始化；`onInit()` 只会执行一次。
 - `MiniBuilder` 会在首帧渲染后自动触发 `onReady()`。
 - 生命周期钩子触发时会在非 release 模式下打印调试日志，release 模式不输出。
 - `update([])` 不会触发任何监听器。
@@ -459,6 +459,8 @@ class OrderController extends MiniNotifier {
 ```
 
 `onInit()` 的生命周期签名是 `void`。写成 `async` 后，框架不会等待其中的 Future；`onReady()` 仍会在首帧后触发，可能早于 API 返回。请求异常需要在 `onInit()` 内处理，不能依赖生命周期调用方捕获。
+
+controller 销毁后，`update()` 是安全的空操作；但异步回调仍应在修改状态或使用 `onClose()` 已释放的资源之前检查 `closed`。如果 HTTP 客户端支持取消请求，应在 `onClose()` 中取消尚未完成的请求。
 
 `onReady()` 仍适合依赖首帧渲染结果的逻辑，不需要为了刷新页面把普通 API 请求延后到 `onReady()`。
 
