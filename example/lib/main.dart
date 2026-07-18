@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:mini_builder/mini_builder.dart';
 
+import 'example_log_manager.dart';
+import 'on_init_api_example.dart';
+
 void main() {
+  ExampleLogManager.instance.info('app_start', source: 'main');
   runApp(const MyApp());
 }
 
@@ -109,6 +113,8 @@ class _MiniBuilderExamplePageState extends State<MiniBuilderExamplePage> {
             children: const <Widget>[
               _IntroPanel(),
               SizedBox(height: 16),
+              OnInitApiExample(),
+              SizedBox(height: 20),
               _AllCounterCard(),
               SizedBox(height: 12),
               _EvenCounterCard(),
@@ -301,7 +307,7 @@ class _CounterCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border.all(color: color.withOpacity(0.28)),
+        border: Border.all(color: color.withAlpha(71)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Padding(
