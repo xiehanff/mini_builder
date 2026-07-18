@@ -462,7 +462,37 @@ class OrderController extends MiniNotifier {
 
 The lifecycle signature of `onInit()` is `void`. Making it `async` does not make the framework await its Future. `onReady()` still runs after the first frame and may run before the API returns. Handle request errors inside `onInit()` instead of relying on the lifecycle caller to catch them.
 
-After the controller is disposed, `update()` is a safe no-op. Async callbacks should still check `closed` before mutating state or using resources released by `onClose()`. When the HTTP client supports cancellation, cancel in-flight requests in `onClose()`.
+### Async responses after disposal
+
+A network request may complete after its page and controller have been disposed. The relevant behaviors are different:
+
+- Calling `MiniNotifier.update()` after disposal is safe; it detects `closed` and returns without notifying listeners.
+- Flutter resources owned by the controller, such as `TextEditingController` and `AnimationController`, are no longer usable after they have been disposed.
+- Check `closed` immediately after every `await`, before mutating state or accessing owned resources.
+- When the HTTP client supports cancellation, cancel in-flight requests in `onClose()`.
+
+```dart
+Future<void> loadProduct() async {
+  final result = await productApi.fetch();
+
+  if (closed) return;
+
+  searchController.text = result.name;
+  entranceAnimation.forward();
+  product = result;
+  update();
+}
+
+@override
+void onClose() {
+  searchController.dispose();
+  entranceAnimation.dispose();
+  requestCancelToken.cancel();
+  super.onClose();
+}
+```
+
+Tests for the safe and unsafe paths are in [`test/async_disposal_resource_test.dart`](test/async_disposal_resource_test.dart).
 
 `onReady()` remains appropriate for logic that depends on the first rendered frame. Regular API requests do not need to be delayed until `onReady()` just to refresh the UI.
 

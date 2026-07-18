@@ -460,7 +460,37 @@ class OrderController extends MiniNotifier {
 
 `onInit()` 的生命周期签名是 `void`。写成 `async` 后，框架不会等待其中的 Future；`onReady()` 仍会在首帧后触发，可能早于 API 返回。请求异常需要在 `onInit()` 内处理，不能依赖生命周期调用方捕获。
 
-controller 销毁后，`update()` 是安全的空操作；但异步回调仍应在修改状态或使用 `onClose()` 已释放的资源之前检查 `closed`。如果 HTTP 客户端支持取消请求，应在 `onClose()` 中取消尚未完成的请求。
+### controller 销毁后的异步返回
+
+网络请求可能在页面和 controller 已经销毁后才返回，需要区分以下行为：
+
+- controller 销毁后调用 `MiniNotifier.update()` 是安全的；它会检测 `closed` 并直接返回，不再通知监听器。
+- controller 持有的 `TextEditingController`、`AnimationController` 等 Flutter 资源一旦销毁，就不能继续访问。
+- 每次 `await` 返回后，应立即检查 `closed`，再修改状态或访问 controller 持有的资源。
+- 如果 HTTP 客户端支持取消请求，应在 `onClose()` 中取消尚未完成的请求。
+
+```dart
+Future<void> loadProduct() async {
+  final result = await productApi.fetch();
+
+  if (closed) return;
+
+  searchController.text = result.name;
+  entranceAnimation.forward();
+  product = result;
+  update();
+}
+
+@override
+void onClose() {
+  searchController.dispose();
+  entranceAnimation.dispose();
+  requestCancelToken.cancel();
+  super.onClose();
+}
+```
+
+安全路径和错误路径的验证见 [`test/async_disposal_resource_test.dart`](test/async_disposal_resource_test.dart)。
 
 `onReady()` 仍适合依赖首帧渲染结果的逻辑，不需要为了刷新页面把普通 API 请求延后到 `onReady()`。
 
