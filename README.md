@@ -109,7 +109,7 @@ class ProductController extends MiniNotifier {
 }
 ```
 
-The controller owner is responsible for creating and disposing the controller. `onInit()` is automatically triggered after the controller is constructed:
+The controller owner is responsible for creating and disposing the controller. After construction, initialization is scheduled in a microtask. If the controller is attached to a `MiniBuilder` first, `MiniBuilder` subscribes before triggering initialization. Both paths share an idempotency guard, so `onInit()` runs only once:
 
 ```dart
 @override
@@ -131,7 +131,7 @@ If you need to execute logic after the first frame renders, place the code in `o
 
 - `onInit()`, `onReady()`, and `onClose()` are lifecycle hooks for business developers to override.
 - The page or widget that holds the controller is responsible for creating and disposing it.
-- `onInit()` is automatically triggered after the controller is constructed.
+- After construction, `onInit()` is triggered by the scheduled microtask or by the first attached `MiniBuilder`, whichever initializes the controller first; it runs only once.
 - `MiniBuilder` automatically triggers `onReady()` after the first frame renders.
 - Lifecycle hooks print debug logs in non-release mode; release mode produces no output.
 - `update([])` does not trigger any listeners.
@@ -461,6 +461,8 @@ class OrderController extends MiniNotifier {
 ```
 
 The lifecycle signature of `onInit()` is `void`. Making it `async` does not make the framework await its Future. `onReady()` still runs after the first frame and may run before the API returns. Handle request errors inside `onInit()` instead of relying on the lifecycle caller to catch them.
+
+After the controller is disposed, `update()` is a safe no-op. Async callbacks should still check `closed` before mutating state or using resources released by `onClose()`. When the HTTP client supports cancellation, cancel in-flight requests in `onClose()`.
 
 `onReady()` remains appropriate for logic that depends on the first rendered frame. Regular API requests do not need to be delayed until `onReady()` just to refresh the UI.
 
