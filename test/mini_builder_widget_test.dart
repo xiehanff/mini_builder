@@ -322,7 +322,7 @@ void main() {
     controller.dispose();
   });
 
-  testWidgets('MiniBuilder skips subscription for disposed controller', (
+  testWidgets('MiniBuilder reports disposed controller in debug mode', (
     tester,
   ) async {
     final controller = _TestController()..dispose();
@@ -338,8 +338,9 @@ void main() {
       ),
     );
 
-    expect(find.text('0'), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    final exception = tester.takeException();
+    expect(exception, isA<AssertionError>());
+    expect(exception.toString(), contains('disposed MiniNotifier'));
   });
 
   testWidgets('MiniBuilder can unmount after controller is disposed', (
