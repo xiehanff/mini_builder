@@ -322,6 +322,7 @@ class _LifecycleController extends MiniNotifier {
 class _ThrowingCloseController extends MiniNotifier {
   @override
   void onClose() {
+    super.onClose();
     throw StateError('close failed');
   }
 }
