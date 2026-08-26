@@ -71,7 +71,7 @@ class MiniNotifier extends ChangeNotifier {
   /// 通知监听器，支持按 id 细粒度刷新。
   /// - ids 为 null 时，通知全部监听器。
   /// - ids 为空时，不通知任何监听器。
-  /// - ids 非空时，仅通知对应 id 的监听器。
+  /// - ids 非空时，仅通知对应 id 的监听器；同一次 update 中重复 id 只通知一次。
   void update([List<String>? ids]) {
     if (_closed) return;
 
@@ -83,7 +83,7 @@ class MiniNotifier extends ChangeNotifier {
 
     if (ids.isEmpty) return;
 
-    for (final id in ids) {
+    for (final id in ids.toSet()) {
       _notifyIdListeners(id);
     }
   }
@@ -100,8 +100,26 @@ class MiniNotifier extends ChangeNotifier {
 
     for (final fn in List<VoidCallback>.of(listeners)) {
       // 先拷贝快照避免遍历时修改列表，再跳过本轮已经移除的 listener。
-      if (_idListeners[id]?.contains(fn) ?? false) {
+      if (!(_idListeners[id]?.contains(fn) ?? false)) continue;
+
+      try {
         fn();
+      } catch (exception, stack) {
+        // 与 ChangeNotifier.notifyListeners() 保持一致：单个监听器异常
+        // 不应阻断同一轮中的其他监听器。
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: exception,
+            stack: stack,
+            library: 'mini_builder',
+            context: ErrorDescription(
+              'while dispatching an update for MiniNotifier id "$id"',
+            ),
+            informationCollector: () => <DiagnosticsNode>[
+              DiagnosticsProperty<MiniNotifier>('controller', this),
+            ],
+          ),
+        );
       }
     }
   }
@@ -112,8 +130,14 @@ class MiniNotifier extends ChangeNotifier {
 
     _closed = true;
     _logLifecycle('onClose');
-    onClose();
-    _idListeners.clear();
-    super.dispose();
+
+    try {
+      onClose();
+    } finally {
+      // 即使业务 onClose 抛异常，也必须完成框架自身的清理，避免 controller
+      // 停留在 closed=true 但 ChangeNotifier 尚未 dispose 的半销毁状态。
+      _idListeners.clear();
+      super.dispose();
+    }
   }
 }
