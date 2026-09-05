@@ -297,6 +297,210 @@ void main() {
 
     controller.dispose();
   });
+
+  test('ids use centralized string constants without collisions', () {
+    final controller = _LifecycleController();
+    var notifyCount = 0;
+
+    controller.addIdListener(_RefreshId.red, () {
+      notifyCount++;
+    });
+
+    controller.update([_RefreshId.red]);
+
+    expect(notifyCount, 1);
+    controller.dispose();
+  });
+
+  test('update keeps the original string-list override signature', () {
+    final controller = _StringOverrideController();
+
+    controller.update(<String>[_RefreshId.red]);
+
+    expect(controller.lastIds, <String>[_RefreshId.red]);
+    controller.dispose();
+  });
+
+  test('watch filters source changes and is disposed with its owner', () {
+    final source = _LifecycleController();
+    final owner = _LifecycleController();
+    final received = <MiniChange>[];
+
+    owner.watch(
+      source,
+      ids: const <String>[_RefreshId.red],
+      onChanged: received.add,
+    );
+
+    source.update([_RefreshId.blue]);
+    source.update([_RefreshId.red]);
+    source.update();
+
+    expect(received, hasLength(2));
+    expect(received.first.ids, <String>{_RefreshId.red});
+    expect(received.last.isFullRefresh, isTrue);
+
+    owner.dispose();
+    source.update([_RefreshId.red]);
+    expect(received, hasLength(2));
+
+    source.dispose();
+  });
+
+  test('watching from a disposed owner returns a cancelled worker', () {
+    final source = _LifecycleController();
+    final owner = _LifecycleController()..dispose();
+    var notifyCount = 0;
+
+    final worker = owner.watch(source, onChanged: (_) {
+      notifyCount++;
+    });
+    source.update();
+
+    expect(worker.disposed, isTrue);
+    expect(notifyCount, 0);
+    source.dispose();
+  });
+
+  test('watch rejects circular controller dependencies', () {
+    final first = _LifecycleController();
+    final second = _LifecycleController();
+
+    first.watch(second, onChanged: (_) {});
+
+    expect(
+      () => second.watch(first, onChanged: (_) {}),
+      throwsA(isA<FlutterError>()),
+    );
+
+    first.dispose();
+    second.dispose();
+  });
+
+  test('watchAll coalesces synchronous dependency changes', () async {
+    final cart = _LifecycleController();
+    final auth = _LifecycleController();
+    final owner = _LifecycleController();
+    final changes = <List<MiniChange>>[];
+
+    owner.watchAll(
+      <MiniWatchSource>[
+        MiniWatchSource(cart, ids: <String>[_RefreshId.red]),
+        MiniWatchSource(auth, ids: <String>[_RefreshId.blue]),
+      ],
+      onChanged: changes.add,
+    );
+
+    cart.update([_RefreshId.red]);
+    auth.update([_RefreshId.blue]);
+    await pumpEventQueue();
+
+    expect(changes, hasLength(1));
+    expect(changes.single, hasLength(2));
+
+    owner.dispose();
+    cart.dispose();
+    auth.dispose();
+  });
+
+  test('Mini.batch merges changes from the same controller', () {
+    final controller = _LifecycleController();
+    final changes = <MiniChange>[];
+    controller.addChangeListener(changes.add);
+
+    Mini.batch(() {
+      controller.update([_RefreshId.red]);
+      controller.update([_RefreshId.blue]);
+    });
+
+    expect(changes, hasLength(1));
+    expect(changes.single.ids, <String>{_RefreshId.red, _RefreshId.blue});
+    controller.dispose();
+  });
+
+  testWidgets('disposing an owner cancels its debounce timer', (tester) async {
+    final source = _LifecycleController();
+    final owner = _LifecycleController();
+    var notifyCount = 0;
+
+    owner.debounce(
+      source,
+      duration: const Duration(seconds: 1),
+      onChanged: (_) {
+        notifyCount++;
+      },
+    );
+
+    source.update();
+    owner.dispose();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(notifyCount, 0);
+    source.dispose();
+  });
+
+  testWidgets('interval resumes after its callback throws', (tester) async {
+    final source = _LifecycleController();
+    final owner = _LifecycleController();
+    final reportedErrors = <FlutterErrorDetails>[];
+    final previousOnError = FlutterError.onError;
+    var notifyCount = 0;
+    FlutterError.onError = reportedErrors.add;
+
+    try {
+      owner.interval(
+        source,
+        duration: const Duration(seconds: 1),
+        onChanged: (_) {
+          notifyCount++;
+          throw StateError('interval callback failed');
+        },
+      );
+
+      source.update();
+      await tester.pump(const Duration(seconds: 1));
+      source.update();
+
+      expect(notifyCount, 2);
+      expect(reportedErrors, hasLength(2));
+    } finally {
+      FlutterError.onError = previousOnError;
+      owner.dispose();
+      source.dispose();
+    }
+  });
+
+  testWidgets('watchAll reports coalesced callback errors', (tester) async {
+    final source = _LifecycleController();
+    final owner = _LifecycleController();
+    final reportedErrors = <FlutterErrorDetails>[];
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = reportedErrors.add;
+
+    try {
+      owner.watchAll(
+        <MiniWatchSource>[MiniWatchSource(source)],
+        onChanged: (_) {
+          throw StateError('coalesced callback failed');
+        },
+      );
+
+      source.update();
+      await tester.pump();
+
+      expect(reportedErrors, hasLength(1));
+      expect(reportedErrors.single.exception, isA<StateError>());
+    } finally {
+      FlutterError.onError = previousOnError;
+      owner.dispose();
+      source.dispose();
+    }
+  });
+}
+
+abstract final class _RefreshId {
+  static const red = 'red';
+  static const blue = 'blue';
 }
 
 class _LifecycleController extends MiniNotifier {
@@ -343,5 +547,15 @@ class _ConstructorBodyController extends MiniNotifier {
   void onInit() {
     super.onInit();
     initProductId = productId;
+  }
+}
+
+class _StringOverrideController extends MiniNotifier {
+  List<String>? lastIds;
+
+  @override
+  void update([List<String>? ids]) {
+    lastIds = ids;
+    super.update(ids);
   }
 }

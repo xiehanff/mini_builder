@@ -1,3 +1,12 @@
+## Unreleased
+
+- Extend `MiniProvider` with `MiniProvider.value` for explicit, subtree-scoped application dependency injection without a `put/find` service locator.
+- Add controller-owned dependency workers: `watch`, `watchAll`, `debounce`, and `interval`. Their subscriptions and timers are cancelled during controller disposal.
+- Add `Mini.batch()` to merge repeated updates from the same controller in one business action.
+- Reject circular worker dependencies and report worker callback failures consistently, including debounced, throttled, and coalesced callbacks.
+- Bound nested update dispatch and batch flush iterations to protect against re-entrant update loops.
+- Add an example and verification for root `MiniProvider.value`, constructor injection, `watchAll`, and `Mini.batch()`.
+
 ## 0.2.1
 
 - `MiniBuilder` 触发初始化时会先订阅 controller，支持在 `onInit()` 请求数据后调用 `update()` 刷新页面。

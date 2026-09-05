@@ -8,7 +8,8 @@
 
 - `MiniNotifier`: Base class for controllers, providing lifecycle hooks, full refresh, and per-id partial refresh.
 - `MiniBuilder`: Subscribes to a controller and rebuilds the current Widget on demand, supporting `id` and `shouldRebuild`.
-- `MiniProvider`: Injects a controller into the widget subtree, avoiding prop drilling.
+- `MiniProvider`: Injects a controller or app dependency into the widget subtree without prop drilling or a `put/find` service locator.
+- `watch`, `watchAll`, `debounce`, and `interval`: Manage controller dependencies and clean them up with their owner.
 - Ideal for page-level state, partial refreshes, and deep controller sharing.
 
 ## Installation
@@ -380,6 +381,109 @@ MiniProvider<ProductController>(
 
 `ProductPanel` reads `inner`. If you need two controllers of the same type in the same subtree, prefer refactoring to different controller types or passing explicitly via constructor parameters. Introducing a tag mechanism prematurely is not recommended.
 
+## Cross-Controller Dependencies and Global State
+
+This package does not expose a `put` / `find` global service locator. Create app-wide state once in the composition root, expose it to routes with `MiniProvider.value`, and inject controller dependencies through constructors. The following is illustrative composition code.
+
+```dart
+class AppServices {
+  AppServices({required this.auth, required this.cart});
+
+  final AuthController auth;
+  final CartController cart;
+
+  void dispose() {
+    auth.dispose();
+    cart.dispose();
+  }
+}
+
+class App extends StatefulWidget {
+  const App({super.key});
+
+  @override
+  State<App> createState() => _AppState();
+}
+
+class _AppState extends State<App> {
+  late final services = AppServices(
+    auth: AuthController(),
+    cart: CartController(),
+  );
+
+  @override
+  void dispose() {
+    services.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MiniProvider<AppServices>.value(
+      value: services,
+      child: const MaterialApp(home: HomePage()),
+    );
+  }
+}
+```
+
+Read the dependencies once at a route boundary, then pass them to the page. The page still owns its own controller:
+
+```dart
+class CheckoutEntry extends StatelessWidget {
+  const CheckoutEntry({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = MiniProvider.of<AppServices>(context);
+    return CheckoutPage(auth: app.auth, cart: app.cart);
+  }
+}
+
+class CheckoutController extends MiniNotifier {
+  CheckoutController({
+    required AuthController auth,
+    required CartController cart,
+  })  : _auth = auth,
+        _cart = cart;
+
+  final AuthController _auth;
+  final CartController _cart;
+
+  @override
+  void onInit() {
+    super.onInit();
+    watchAll(
+      [
+        MiniWatchSource(_auth, ids: [AuthIds.session]),
+        MiniWatchSource(_cart, ids: [CartIds.items]),
+      ],
+      onChanged: (_) => refreshQuote(),
+    );
+  }
+}
+```
+
+`watch` observes one source. `watchAll` coalesces synchronous changes into one callback by default. `debounce` and `interval` provide debouncing and throttling. Every worker is owned by the current controller and cancels its subscription and timer on `dispose()`. `Mini.batch(() { ... })` merges repeated `update()` calls for the same controller during one business action, so both widgets and dependent controllers receive one merged change. Worker registration rejects circular dependencies, and callback failures use Flutter error reporting without leaving an `interval` worker throttled forever.
+
+**Performance guidance**: Keep the number of workers per controller reasonable (typically under 10 direct dependencies). For complex dependency graphs, consider introducing an intermediate coordinator controller rather than creating deep chains. A full `update()` has no declared ids, so it matches every id-filtered worker. The framework also limits nested dispatch depth and batch flush iterations to prevent an invalid re-entrant update from exhausting the call stack or event loop.
+
+See the runnable UI example in [`example/lib/dependency_worker_example.dart`](example/lib/dependency_worker_example.dart) and its verification in [`example/test/dependency_worker_example_test.dart`](example/test/dependency_worker_example_test.dart). It demonstrates root `MiniProvider.value`, constructor injection, `watchAll`, and `Mini.batch()`.
+
+Refresh ids remain `String` values. Define them in one place to avoid project-wide string collisions:
+
+```dart
+abstract final class CartIds {
+  static const items = 'cart.items';
+  static const summary = 'cart.summary';
+}
+
+void add(Product product) {
+  cart = cart.add(product);
+  update([CartIds.items, CartIds.summary]);
+}
+```
+
 ## Product Detail Page Scenario
 
 When clicking on a similar product to enter a new detail page, it is typically a new route, new page instance, new controller:
@@ -571,16 +675,16 @@ The example uses [`ExampleLogManager`](example/lib/example_log_manager.dart) for
 
 Run the Android example from the `example` directory with `flutter run -d <device-id>`. The generated Android host currently uses a sample application ID and debug signing and is intended only for functional verification. Replace the package name, signing configuration, and CI secret-management setup before an enterprise release.
 
-### ❌ Using MiniProvider for cross-route global sharing
+### A page MiniProvider does not cross routes
 
-`MiniProvider` injects into the widget subtree, not a global singleton. For cross-route sharing, use a global controller or state management solution:
+A `MiniProvider` at a page root only covers that page subtree, so a new route cannot read it. Put app-wide dependencies in a root `MiniProvider.value` that wraps `MaterialApp`; each new route still creates and disposes its page controller:
 
 ```dart
-// ❌ Wrong: expecting another route's page to read via MiniProvider.of
+// ❌ A page MiniProvider does not reach the new route
 Navigator.of(context).push(
   MaterialPageRoute(builder: (_) => const AnotherPage()),
 );
-// AnotherPage won't find MiniProvider.of<T>(context)
+// AnotherPage cannot find the page-private controller
 ```
 
 ```dart
@@ -615,7 +719,7 @@ A:
 
 **Q: Can I use MiniNotifier in a global singleton?**
 
-A: Yes, but you must manually manage its lifecycle. MiniNotifier is better suited for page-level controllers. For global state, consider Provider or other global state management solutions.
+A: Prefer constructing app-wide controllers at the composition root and exposing them below `MaterialApp` with `MiniProvider.value`. The root owns their lifecycle; page controllers should still be created and disposed by their pages. The package does not provide a `put/find` global registry.
 
 ---
 
@@ -726,16 +830,16 @@ class OrderController extends MiniNotifier {
 }
 ```
 
-### ❌ Using MiniProvider for cross-route global sharing
+### A page MiniProvider does not cross routes
 
-`MiniProvider` injects into the widget subtree, not a global singleton. For cross-route sharing, use a global controller or state management solution:
+A `MiniProvider` at a page root only covers that page subtree. Put app-wide dependencies in a root `MiniProvider.value` that wraps `MaterialApp`; each route still owns its page controller:
 
 ```dart
-// ❌ Wrong: expecting another route's page to read via MiniProvider.of
+// ❌ A page MiniProvider does not reach the new route
 Navigator.of(context).push(
   MaterialPageRoute(builder: (_) => const AnotherPage()),
 );
-// AnotherPage won't find MiniProvider.of<T>(context)
+// AnotherPage cannot find the page-private controller
 ```
 
 ```dart

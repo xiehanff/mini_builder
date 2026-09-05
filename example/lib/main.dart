@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mini_builder/mini_builder.dart';
 
 import 'example_log_manager.dart';
+import 'dependency_worker_example.dart';
 import 'on_init_api_example.dart';
 
 void main() {
@@ -9,18 +10,34 @@ void main() {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late final DemoAppServices _services = DemoAppServices();
+
+  @override
+  void dispose() {
+    _services.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'MiniBuilder Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
+    return MiniProvider<DemoAppServices>.value(
+      value: _services,
+      child: MaterialApp(
+        title: 'MiniBuilder Demo',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+          useMaterial3: true,
+        ),
+        home: const MiniBuilderExamplePage(),
       ),
-      home: const MiniBuilderExamplePage(),
     );
   }
 }
@@ -122,6 +139,8 @@ class _MiniBuilderExamplePageState extends State<MiniBuilderExamplePage> {
               _IdCounterGrid(),
               SizedBox(height: 20),
               _ActionPanel(),
+              SizedBox(height: 28),
+              DependencyWorkerExampleEntry(),
               SizedBox(height: 28),
               _SectionTitle(title: '商品详情页场景'),
               SizedBox(height: 12),

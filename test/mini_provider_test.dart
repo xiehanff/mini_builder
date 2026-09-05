@@ -71,6 +71,113 @@ void main() {
     outer.dispose();
     inner.dispose();
   });
+
+  testWidgets('MiniProvider.value provides application dependencies', (
+    tester,
+  ) async {
+    const services = _AppServices('signed-in-user');
+
+    await tester.pumpWidget(
+      const Directionality(
+        textDirection: TextDirection.ltr,
+        child: MiniProvider<_AppServices>.value(
+          value: services,
+          child: Builder(
+            builder: _appServicesText,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('signed-in-user'), findsOneWidget);
+  });
+
+  testWidgets('MiniProvider.value notifies dependents only when value changes',
+      (
+    tester,
+  ) async {
+    final hostKey = GlobalKey<_ScopeHostState>();
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: _ScopeHost(key: hostKey),
+      ),
+    );
+
+    expect(find.text('first: 1'), findsOneWidget);
+
+    hostKey.currentState!.rebuildWithSameValue();
+    await tester.pump();
+    expect(find.text('first: 1'), findsOneWidget);
+
+    hostKey.currentState!.replaceValue();
+    await tester.pump();
+    expect(find.text('second: 2'), findsOneWidget);
+  });
+}
+
+Widget _appServicesText(BuildContext context) {
+  return Text(MiniProvider.of<_AppServices>(context).userName);
+}
+
+class _AppServices {
+  const _AppServices(this.userName);
+
+  final String userName;
+}
+
+class _ScopeHost extends StatefulWidget {
+  const _ScopeHost({super.key});
+
+  @override
+  State<_ScopeHost> createState() => _ScopeHostState();
+}
+
+class _ScopeHostState extends State<_ScopeHost> {
+  _AppServices services = const _AppServices('first');
+
+  void rebuildWithSameValue() {
+    setState(() {});
+  }
+
+  void replaceValue() {
+    setState(() {
+      services = const _AppServices('second');
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MiniProvider<_AppServices>.value(
+      value: services,
+      child: const _ScopeConsumer(),
+    );
+  }
+}
+
+class _ScopeConsumer extends StatefulWidget {
+  const _ScopeConsumer();
+
+  @override
+  State<_ScopeConsumer> createState() => _ScopeConsumerState();
+}
+
+class _ScopeConsumerState extends State<_ScopeConsumer> {
+  var dependencyChanges = 0;
+  late String userName;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    dependencyChanges++;
+    userName = MiniProvider.of<_AppServices>(context).userName;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text('$userName: $dependencyChanges');
+  }
 }
 
 class _TestController extends MiniNotifier {
