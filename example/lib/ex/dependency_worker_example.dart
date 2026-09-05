@@ -84,7 +84,7 @@ class DemoCheckoutController extends MiniNotifier {
   }
 }
 
-/// Demonstrates root [MiniProvider.value], constructor injection, [watchAll],
+/// Demonstrates root [MiniProvider], constructor injection, [watchAll],
 /// and [Mini.batch] without a service locator.
 class DependencyWorkerExampleEntry extends StatelessWidget {
   const DependencyWorkerExampleEntry({super.key});
@@ -136,7 +136,7 @@ class _DependencyWorkerExampleState extends State<DependencyWorkerExample> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'App 根部通过 MiniProvider.value 提供登录态和购物车；'
+              'App 根部通过 MiniProvider 提供登录态和购物车；'
               '结算页 controller 经构造函数注入它们，并用 watchAll 自动重算。',
             ),
             const SizedBox(height: 12),

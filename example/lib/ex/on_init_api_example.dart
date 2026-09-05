@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mini_builder/mini_builder.dart';
 
-import 'example_log_manager.dart';
+import '../example_log_manager.dart';
 
 class OnInitApiExampleProduct {
   final String id;

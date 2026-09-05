@@ -14,15 +14,20 @@
 
 ## Installation
 
-For local development, add as a path dependency in `pubspec.yaml`:
+Add this to your package's `pubspec.yaml` file:
+
+```yaml
+dependencies:
+  mini_builder: ^0.3.0
+```
+
+For local development, you can use a path dependency:
 
 ```yaml
 dependencies:
   mini_builder:
     path: ../mini_builder
 ```
-
-Adjust the `path` according to your actual project structure.
 
 Import in business code:
 
@@ -329,7 +334,7 @@ Inject at page root:
 
 ```dart
 MiniProvider<ProductController>(
-  controller: controller,
+  value: controller,
   child: const ProductDetailView(),
 )
 ```
@@ -352,9 +357,9 @@ Different controller types can be nested directly:
 
 ```dart
 MiniProvider<UserController>(
-  controller: userController,
+  value: userController,
   child: MiniProvider<CartController>(
-    controller: cartController,
+    value: cartController,
     child: const PageContent(),
   ),
 )
@@ -371,9 +376,9 @@ When nesting controllers of the same type, `MiniProvider.of<T>()` returns the ne
 
 ```dart
 MiniProvider<ProductController>(
-  controller: outer,
+  value: outer,
   child: MiniProvider<ProductController>(
-    controller: inner,
+    value: inner,
     child: const ProductPanel(),
   ),
 )
@@ -383,7 +388,7 @@ MiniProvider<ProductController>(
 
 ## Cross-Controller Dependencies and Global State
 
-This package does not expose a `put` / `find` global service locator. Create app-wide state once in the composition root, expose it to routes with `MiniProvider.value`, and inject controller dependencies through constructors. The following is illustrative composition code.
+This package does not expose a `put` / `find` global service locator. Create app-wide state once in the composition root, expose it to routes with `MiniProvider`, and inject controller dependencies through constructors. The following is illustrative composition code.
 
 ```dart
 class AppServices {
@@ -419,7 +424,7 @@ class _AppState extends State<App> {
 
   @override
   Widget build(BuildContext context) {
-    return MiniProvider<AppServices>.value(
+    return MiniProvider<AppServices>(
       value: services,
       child: const MaterialApp(home: HomePage()),
     );
@@ -468,7 +473,7 @@ class CheckoutController extends MiniNotifier {
 
 **Performance guidance**: Keep the number of workers per controller reasonable (typically under 10 direct dependencies). For complex dependency graphs, consider introducing an intermediate coordinator controller rather than creating deep chains. A full `update()` has no declared ids, so it matches every id-filtered worker. The framework also limits nested dispatch depth and batch flush iterations to prevent an invalid re-entrant update from exhausting the call stack or event loop.
 
-See the runnable UI example in [`example/lib/dependency_worker_example.dart`](example/lib/dependency_worker_example.dart) and its verification in [`example/test/dependency_worker_example_test.dart`](example/test/dependency_worker_example_test.dart). It demonstrates root `MiniProvider.value`, constructor injection, `watchAll`, and `Mini.batch()`.
+See the runnable UI example in [`example/lib/ex/dependency_worker_example.dart`](example/lib/ex/dependency_worker_example.dart) and its verification in [`example/test/dependency_worker_example_test.dart`](example/test/dependency_worker_example_test.dart). It demonstrates root `MiniProvider`, constructor injection, `watchAll`, and `Mini.batch()`.
 
 Refresh ids remain `String` values. Define them in one place to avoid project-wide string collisions:
 
@@ -529,7 +534,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   @override
   Widget build(BuildContext context) {
     return MiniProvider<ProductController>(
-      controller: controller,
+      value: controller,
       child: const ProductDetailView(),
     );
   }
@@ -677,7 +682,7 @@ Run the Android example from the `example` directory with `flutter run -d <devic
 
 ### A page MiniProvider does not cross routes
 
-A `MiniProvider` at a page root only covers that page subtree, so a new route cannot read it. Put app-wide dependencies in a root `MiniProvider.value` that wraps `MaterialApp`; each new route still creates and disposes its page controller:
+A `MiniProvider` at a page root only covers that page subtree, so a new route cannot read it. Put app-wide dependencies in a root `MiniProvider` that wraps `MaterialApp`; each new route still creates and disposes its page controller:
 
 ```dart
 // ❌ A page MiniProvider does not reach the new route
@@ -719,7 +724,7 @@ A:
 
 **Q: Can I use MiniNotifier in a global singleton?**
 
-A: Prefer constructing app-wide controllers at the composition root and exposing them below `MaterialApp` with `MiniProvider.value`. The root owns their lifecycle; page controllers should still be created and disposed by their pages. The package does not provide a `put/find` global registry.
+A: Prefer constructing app-wide controllers at the composition root and exposing them below `MaterialApp` with `MiniProvider`. The root owns their lifecycle; page controllers should still be created and disposed by their pages. The package does not provide a `put/find` global registry.
 
 ---
 
@@ -832,7 +837,7 @@ class OrderController extends MiniNotifier {
 
 ### A page MiniProvider does not cross routes
 
-A `MiniProvider` at a page root only covers that page subtree. Put app-wide dependencies in a root `MiniProvider.value` that wraps `MaterialApp`; each route still owns its page controller:
+A `MiniProvider` at a page root only covers that page subtree. Put app-wide dependencies in a root `MiniProvider` that wraps `MaterialApp`; each route still owns its page controller:
 
 ```dart
 // ❌ A page MiniProvider does not reach the new route

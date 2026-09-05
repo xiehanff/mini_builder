@@ -1,17 +1,49 @@
-# mini_builder_example
+# MiniBuilder Example
 
-A new Flutter project.
+此示例演示 MiniBuilder 的核心功能：
 
-## Getting Started
+## 功能展示
 
-This project is a starting point for a Flutter application.
+1. **细粒度刷新**
+   - 全量 `update()` 刷新所有监听器
+   - 按 id 的局部刷新
+   - `shouldRebuild` 条件重建
 
-A few resources to get you started if this is your first Flutter project:
+2. **跨 Controller 依赖**（`ex/dependency_worker_example.dart`）
+   - 根部 `MiniProvider` 注入应用依赖
+   - 构造函数显式注入
+   - `watchAll` 监听多个依赖
+   - `Mini.batch()` 批量更新
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+3. **onInit 异步请求**（`ex/on_init_api_example.dart`）
+   - 在 `onInit()` 中请求 API
+   - 嵌套 controller 的生命周期
+   - 异常处理和状态更新
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 运行示例
+
+### Web（推荐）
+```bash
+flutter run -d chrome
+```
+
+### macOS/Linux/Windows
+```bash
+flutter run
+```
+
+### 移动平台
+由于示例主要展示库功能而非平台特性，当前版本移除了 Android/iOS 配置以简化维护。
+如需在移动平台测试，可以：
+1. 创建新的 Flutter 项目
+2. 将 `lib/` 下的示例代码复制过去
+3. 添加 `mini_builder` 依赖
+
+## 运行测试
+
+```bash
+cd example
+flutter test
+```
+
+**已知问题**：`dependency_worker_example_test.dart` 在某些环境下可能因 Flutter 框架的 shader 资源问题失败，这不影响实际功能。核心库测试（项目根目录 `test/`）全部通过。

@@ -258,7 +258,7 @@ class OrderFooter extends StatelessWidget {
 
 ```dart
 MiniProvider<ProductController>(
-  controller: controller,
+  value: controller,
   child: const ProductDetailView(),
 )
 ```
@@ -281,9 +281,9 @@ final controller = MiniProvider.maybeOf<ProductController>(context);
 
 ```dart
 MiniProvider<UserController>(
-  controller: userController,
+  value: userController,
   child: MiniProvider<CartController>(
-    controller: cartController,
+    value: cartController,
     child: const PageContent(),
   ),
 )
@@ -300,9 +300,9 @@ final cart = MiniProvider.of<CartController>(context);
 
 ```dart
 MiniProvider<ProductController>(
-  controller: outer,
+  value: outer,
   child: MiniProvider<ProductController>(
-    controller: inner,
+    value: inner,
     child: const ProductPanel(),
   ),
 )
@@ -312,7 +312,7 @@ MiniProvider<ProductController>(
 
 ## 跨 Controller 依赖与全局状态
 
-本库不提供 `put` / `find` 形式的全局服务定位器。全局状态在应用组合根创建一次，通过 `MiniProvider.value` 提供给路由；controller 之间通过构造函数显式注入依赖。以下为组合方式示意。
+本库不提供 `put` / `find` 形式的全局服务定位器。全局状态在应用组合根创建一次，通过 `MiniProvider` 提供给路由；controller 之间通过构造函数显式注入依赖。以下为组合方式示意。
 
 ```dart
 class AppServices {
@@ -348,7 +348,7 @@ class _AppState extends State<App> {
 
   @override
   Widget build(BuildContext context) {
-    return MiniProvider<AppServices>.value(
+    return MiniProvider<AppServices>(
       value: services,
       child: const MaterialApp(home: HomePage()),
     );
@@ -397,7 +397,7 @@ class CheckoutController extends MiniNotifier {
 
 **性能指导**：单个 controller 的 worker 数量应保持适度（通常不超过 10 个直接依赖）。对于复杂的依赖图，考虑引入中间协调器 controller，而不是创建过深的依赖链。全量 `update()` 未声明变更 id，因此会触发所有按 id 订阅的 Worker；框架还会限制嵌套派发深度和 batch flush 轮数，防止错误的重入更新耗尽调用栈或事件循环。
 
-可运行的界面示例见 [`example/lib/dependency_worker_example.dart`](example/lib/dependency_worker_example.dart)，对应验证见 [`example/test/dependency_worker_example_test.dart`](example/test/dependency_worker_example_test.dart)。它演示根部 `MiniProvider.value`、构造函数注入、`watchAll` 和 `Mini.batch()`。
+可运行的界面示例见 [`example/lib/ex/dependency_worker_example.dart`](example/lib/ex/dependency_worker_example.dart)，对应验证见 [`example/test/dependency_worker_example_test.dart`](example/test/dependency_worker_example_test.dart)。它演示根部 `MiniProvider`、构造函数注入、`watchAll` 和 `Mini.batch()`。
 
 刷新 id 保持 `String`，推荐用集中定义的常量避免字符串冲突：
 
@@ -458,7 +458,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   @override
   Widget build(BuildContext context) {
     return MiniProvider<ProductController>(
-      controller: controller,
+      value: controller,
       child: const ProductDetailView(),
     );
   }
@@ -606,7 +606,7 @@ Android 示例可在 `example` 目录执行 `flutter run -d <device-id>` 启动�
 
 ### 页面 MiniProvider 不会跨路由
 
-页面根部的 `MiniProvider` 只覆盖该页面子树，新路由不能读取它。应用级依赖应由根部 `MiniProvider.value` 包住 `MaterialApp`；新路由仍自行创建和释放页面 controller：
+页面根部的 `MiniProvider` 只覆盖该页面子树，新路由不能读取它。应用级依赖应由根部 `MiniProvider` 包住 `MaterialApp`；新路由仍自行创建和释放页面 controller：
 
 ```dart
 // ❌ 页面 MiniProvider 无法提供给新路由

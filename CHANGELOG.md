@@ -1,11 +1,49 @@
-## Unreleased
+## 0.3.0
 
-- Extend `MiniProvider` with `MiniProvider.value` for explicit, subtree-scoped application dependency injection without a `put/find` service locator.
-- Add controller-owned dependency workers: `watch`, `watchAll`, `debounce`, and `interval`. Their subscriptions and timers are cancelled during controller disposal.
-- Add `Mini.batch()` to merge repeated updates from the same controller in one business action.
-- Reject circular worker dependencies and report worker callback failures consistently, including debounced, throttled, and coalesced callbacks.
-- Bound nested update dispatch and batch flush iterations to protect against re-entrant update loops.
-- Add an example and verification for root `MiniProvider.value`, constructor injection, `watchAll`, and `Mini.batch()`.
+### ⚠️ Breaking Changes
+
+- **移除** `MiniProvider(controller: ...)` 旧构造函数和 `controller` getter
+- 现在使用 `MiniProvider(value: ...)` 构造函数
+
+#### 迁移指南
+
+替换旧写法：
+```dart
+// ❌ 旧写法（已移除）
+MiniProvider<MyController>(
+  controller: myController,
+  child: MyWidget(),
+)
+
+// 以及
+final controller = MiniProvider.of<MyController>(context).controller;
+```
+
+使用新写法：
+```dart
+// ✅ 新写法
+MiniProvider<MyController>(
+  value: myController,
+  child: MyWidget(),
+)
+
+// 读取方式不变
+final controller = MiniProvider.of<MyController>(context);
+```
+
+### 新增功能
+
+- 新增 `MiniProvider` 用于显式依赖注入，无需 `put/find` 式全局服务定位器
+- 新增 controller 持有的依赖 worker：`watch`、`watchAll`、`debounce`、`interval`，订阅和计时器随 controller 销毁自动取消
+- 新增 `Mini.batch()` 合并同一 controller 在单次业务操作中的多次 `update()` 调用
+- 拒绝循环 worker 依赖，并一致地报告 worker 回调失败（包括防抖、节流和合并的回调）
+- 限制嵌套更新派发深度和批处理刷新迭代次数，防止重入更新循环
+- 新增示例和验证：根部 `MiniProvider`、构造函数注入、`watchAll`、`Mini.batch()`
+- 所有公开 API 文档注释完全中文化
+
+### 已知问题
+
+- 示例 App 在某些 Flutter 版本的测试环境中可能遇到 shader 资源加载错误（`ink_sparkle.frag`），这是 Flutter 框架已知问题，不影响实际运行和库的核心功能
 
 ## 0.2.1
 

@@ -10,7 +10,7 @@ void main() {
       Directionality(
         textDirection: TextDirection.ltr,
         child: MiniProvider<_TestController>(
-          controller: controller,
+          value: controller,
           child: Builder(
             builder: (context) {
               return Text('${MiniProvider.of<_TestController>(context).count}');
@@ -52,9 +52,9 @@ void main() {
       Directionality(
         textDirection: TextDirection.ltr,
         child: MiniProvider<_TestController>(
-          controller: outer,
+          value: outer,
           child: MiniProvider<_TestController>(
-            controller: inner,
+            value: inner,
             child: Builder(
               builder: (context) {
                 final controller = MiniProvider.of<_TestController>(context);
@@ -72,7 +72,7 @@ void main() {
     inner.dispose();
   });
 
-  testWidgets('MiniProvider.value provides application dependencies', (
+  testWidgets('MiniProvider provides application dependencies', (
     tester,
   ) async {
     const services = _AppServices('signed-in-user');
@@ -80,7 +80,7 @@ void main() {
     await tester.pumpWidget(
       const Directionality(
         textDirection: TextDirection.ltr,
-        child: MiniProvider<_AppServices>.value(
+        child: MiniProvider<_AppServices>(
           value: services,
           child: Builder(
             builder: _appServicesText,
@@ -92,8 +92,7 @@ void main() {
     expect(find.text('signed-in-user'), findsOneWidget);
   });
 
-  testWidgets('MiniProvider.value notifies dependents only when value changes',
-      (
+  testWidgets('MiniProvider notifies dependents only when value changes', (
     tester,
   ) async {
     final hostKey = GlobalKey<_ScopeHostState>();
@@ -149,7 +148,7 @@ class _ScopeHostState extends State<_ScopeHost> {
 
   @override
   Widget build(BuildContext context) {
-    return MiniProvider<_AppServices>.value(
+    return MiniProvider<_AppServices>(
       value: services,
       child: const _ScopeConsumer(),
     );

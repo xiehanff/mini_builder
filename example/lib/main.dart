@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:mini_builder/mini_builder.dart';
 
 import 'example_log_manager.dart';
-import 'dependency_worker_example.dart';
-import 'on_init_api_example.dart';
+import 'ex/dependency_worker_example.dart';
+import 'ex/on_init_api_example.dart';
 
 void main() {
   ExampleLogManager.instance.info('app_start', source: 'main');
@@ -28,7 +28,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MiniProvider<DemoAppServices>.value(
+    return MiniProvider<DemoAppServices>(
       value: _services,
       child: MaterialApp(
         title: 'MiniBuilder Demo',
@@ -121,7 +121,7 @@ class _MiniBuilderExamplePageState extends State<MiniBuilderExamplePage> {
   @override
   Widget build(BuildContext context) {
     return MiniProvider<MiniCounterController>(
-      controller: _controller,
+      value: _controller,
       child: Scaffold(
         appBar: AppBar(title: const Text('MiniBuilder 示例')),
         body: SafeArea(
@@ -198,6 +198,7 @@ class _AllCounterCard extends StatelessWidget {
         return _CounterCard(
           title: '全量区域',
           value: controller.allCount,
+          valueKey: const ValueKey<String>('all-counter-value'),
           description: '只会被 update() 刷新',
           color: Theme.of(context).colorScheme.primary,
         );
@@ -310,12 +311,14 @@ class _BlueCounterCard extends StatelessWidget {
 class _CounterCard extends StatelessWidget {
   final String title;
   final int value;
+  final Key? valueKey;
   final String description;
   final Color color;
 
   const _CounterCard({
     required this.title,
     required this.value,
+    this.valueKey,
     required this.description,
     required this.color,
   });
@@ -338,6 +341,7 @@ class _CounterCard extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               '$value',
+              key: valueKey,
               style: textTheme.displaySmall?.copyWith(
                 color: color,
                 fontWeight: FontWeight.w700,
@@ -410,7 +414,7 @@ class _ProductDetailDemoState extends State<ProductDetailDemo> {
   @override
   Widget build(BuildContext context) {
     return MiniProvider<ProductDetailController>(
-      controller: _controller,
+      value: _controller,
       child: const _ProductDetailContent(),
     );
   }

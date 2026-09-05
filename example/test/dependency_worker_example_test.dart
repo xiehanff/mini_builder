@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mini_builder/mini_builder.dart';
-import 'package:mini_builder_example/dependency_worker_example.dart';
+import 'package:mini_builder_example/ex/dependency_worker_example.dart';
 
 void main() {
   testWidgets('watchAll recalculates once for a batched global update', (
@@ -13,7 +13,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: MiniProvider<DemoAppServices>.value(
+          body: MiniProvider<DemoAppServices>(
             value: services,
             child: const DependencyWorkerExampleEntry(),
           ),
