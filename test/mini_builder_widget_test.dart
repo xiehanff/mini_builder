@@ -58,6 +58,24 @@ void main() {
     controller.dispose();
   });
 
+  testWidgets('update in onInit notifies MiniBuilder', (tester) async {
+    final hostKey = GlobalKey<_OnInitUpdateHostState>();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: _OnInitUpdateHost(key: hostKey),
+      ),
+    );
+
+    final controller = hostKey.currentState!.controller;
+    expect(controller.initCount, 1);
+    expect(hostKey.currentState!.updateCount, 1);
+    expect(find.text('1'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(controller.closed, isTrue);
+  });
+
   testWidgets('MiniBuilder prints onReady debug log once', (tester) async {
     final logs = <String>[];
     final previousDebugPrint = debugPrint;
@@ -304,7 +322,7 @@ void main() {
     controller.dispose();
   });
 
-  testWidgets('MiniBuilder skips subscription for disposed controller', (
+  testWidgets('MiniBuilder reports disposed controller in debug mode', (
     tester,
   ) async {
     final controller = _TestController()..dispose();
@@ -320,8 +338,9 @@ void main() {
       ),
     );
 
-    expect(find.text('0'), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    final exception = tester.takeException();
+    expect(exception, isA<AssertionError>());
+    expect(exception.toString(), contains('disposed MiniNotifier'));
   });
 
   testWidgets('MiniBuilder can unmount after controller is disposed', (
@@ -379,6 +398,51 @@ class _TestController extends MiniNotifier {
   void onReady() {
     super.onReady();
     readyCount++;
+  }
+}
+
+class _OnInitUpdateController extends MiniNotifier {
+  int count = 0;
+  int initCount = 0;
+
+  @override
+  void onInit() {
+    super.onInit();
+    initCount++;
+    count++;
+    update();
+  }
+}
+
+class _OnInitUpdateHost extends StatefulWidget {
+  const _OnInitUpdateHost({super.key});
+
+  @override
+  State<_OnInitUpdateHost> createState() => _OnInitUpdateHostState();
+}
+
+class _OnInitUpdateHostState extends State<_OnInitUpdateHost> {
+  final controller = _OnInitUpdateController();
+  int updateCount = 0;
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MiniBuilder<_OnInitUpdateController>(
+      controller: controller,
+      shouldRebuild: (controller) {
+        updateCount++;
+        return true;
+      },
+      builder: (context, controller) {
+        return Text('${controller.count}');
+      },
+    );
   }
 }
 

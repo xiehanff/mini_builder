@@ -24,9 +24,10 @@ class _MiniBuilderState<T extends MiniNotifier> extends State<MiniBuilder<T>> {
   @override
   void initState() {
     super.initState();
+    _debugAssertControllerOpen(widget.controller);
     _listener = _handleUpdate;
-    widget.controller._ensureInitialized();
     _subscribe();
+    widget.controller._ensureInitialized();
     _scheduleReady(widget.controller);
   }
 
@@ -34,9 +35,10 @@ class _MiniBuilderState<T extends MiniNotifier> extends State<MiniBuilder<T>> {
   void didUpdateWidget(covariant MiniBuilder<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
+      _debugAssertControllerOpen(widget.controller);
       _unsubscribe(oldWidget.controller, oldWidget.id);
-      widget.controller._ensureInitialized();
       _subscribe();
+      widget.controller._ensureInitialized();
       _scheduleReady(widget.controller);
       return;
     }
@@ -51,6 +53,14 @@ class _MiniBuilderState<T extends MiniNotifier> extends State<MiniBuilder<T>> {
   void dispose() {
     _unsubscribe(widget.controller, widget.id);
     super.dispose();
+  }
+
+  void _debugAssertControllerOpen(MiniNotifier controller) {
+    assert(
+      !controller.closed,
+      'MiniBuilder<$T> cannot use a disposed MiniNotifier. '
+      'Create a live controller before mounting MiniBuilder.',
+    );
   }
 
   void _subscribe() {

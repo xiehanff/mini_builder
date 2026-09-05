@@ -43,6 +43,29 @@ void main() {
     expect(idNotifyCount, 0);
   });
 
+  test('dispose completes framework cleanup when onClose throws', () {
+    final controller = _ThrowingCloseController();
+    var idNotifyCount = 0;
+
+    controller.addIdListener('red', () {
+      idNotifyCount++;
+    });
+
+    expect(controller.dispose, throwsStateError);
+    expect(controller.closed, isTrue);
+
+    // A second dispose is idempotent even though the first onClose failed.
+    expect(controller.dispose, returnsNormally);
+    controller.update(['red']);
+    expect(idNotifyCount, 0);
+
+    // ChangeNotifier.dispose() must have run from finally.
+    expect(
+      () => controller.addListener(() {}),
+      throwsA(anyOf(isA<FlutterError>(), isA<AssertionError>())),
+    );
+  });
+
   test('lifecycle hooks print debug logs once', () async {
     final logs = <String>[];
     final previousDebugPrint = debugPrint;
@@ -151,6 +174,20 @@ void main() {
     controller.dispose();
   });
 
+  test('update with duplicate ids notifies each id once', () {
+    final controller = _LifecycleController();
+    var redNotifyCount = 0;
+
+    controller.addIdListener('red', () {
+      redNotifyCount++;
+    });
+
+    controller.update(['red', 'red', 'red']);
+
+    expect(redNotifyCount, 1);
+    controller.dispose();
+  });
+
   test('update with id only notifies matching id listeners', () {
     final controller = _LifecycleController();
     var globalNotifyCount = 0;
@@ -174,6 +211,31 @@ void main() {
     expect(blueNotifyCount, 0);
 
     controller.dispose();
+  });
+
+  test('id listener failure does not prevent later listeners', () {
+    final controller = _LifecycleController();
+    var secondNotifyCount = 0;
+    final reportedErrors = <FlutterErrorDetails>[];
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = reportedErrors.add;
+
+    try {
+      controller.addIdListener('red', () {
+        throw StateError('listener failed');
+      });
+      controller.addIdListener('red', () {
+        secondNotifyCount++;
+      });
+
+      expect(() => controller.update(['red']), returnsNormally);
+      expect(secondNotifyCount, 1);
+      expect(reportedErrors, hasLength(1));
+      expect(reportedErrors.single.exception, isA<StateError>());
+    } finally {
+      FlutterError.onError = previousOnError;
+      controller.dispose();
+    }
   });
 
   test('update with nonexistent id is a no-op', () {
@@ -258,6 +320,14 @@ class _LifecycleController extends MiniNotifier {
   void onClose() {
     super.onClose();
     onCloseCount++;
+  }
+}
+
+class _ThrowingCloseController extends MiniNotifier {
+  @override
+  void onClose() {
+    super.onClose();
+    throw StateError('close failed');
   }
 }
 
