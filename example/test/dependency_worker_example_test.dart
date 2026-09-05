@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mini_builder/mini_builder.dart';
-import 'package:mini_builder_example/ex/dependency_worker_example.dart';
+import 'package:mini_builder_example/app/app_services.dart';
+import 'package:mini_builder_example/features/dependency/dependency_worker_example.dart';
 
 void main() {
   testWidgets('watchAll recalculates once for a batched global update', (

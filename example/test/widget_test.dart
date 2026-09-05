@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mini_builder/mini_builder.dart';
-import 'package:mini_builder_example/main.dart';
+import 'package:mini_builder_example/features/counter/counter_controller.dart';
 
 void main() {
   testWidgets('MiniBuilder refreshes the example counter', (

@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mini_builder_example/example_log_manager.dart';
-import 'package:mini_builder_example/ex/on_init_api_example.dart';
+import 'package:mini_builder_example/features/lifecycle/on_init_api_example.dart';
+import 'package:mini_builder_example/shared/example_log_manager.dart';
 
 void main() {
   testWidgets('nested controllers request and update from onInit', (

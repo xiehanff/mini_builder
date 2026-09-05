@@ -1,6 +1,8 @@
 # mini_builder
 
-[`中文文档`](./README_CN.md)
+[`中文文档`](./README_zh.md)
+
+Coding agents can use the [agent quickstart](./docs/agent_quickstart.md) for the package's ownership rules and API templates.
 
 `mini_builder` is a lightweight Flutter state refresh utility, suitable for page-level controllers, partial refreshes, and deep controller injection.
 
@@ -11,6 +13,34 @@
 - `MiniProvider`: Injects a controller or app dependency into the widget subtree without prop drilling or a `put/find` service locator.
 - `watch`, `watchAll`, `debounce`, and `interval`: Manage controller dependencies and clean them up with their owner.
 - Ideal for page-level state, partial refreshes, and deep controller sharing.
+
+## Design Philosophy
+
+`mini_builder` treats state as an object with an owner, a scope, and an explicit notification boundary:
+
+- **Explicit dependencies over hidden lookup**: pass controller dependencies through constructors; use `MiniProvider<T>(value: ..., child: ...)` only at a composition boundary.
+- **The owner controls lifetime**: the widget or feature that creates a controller also disposes it. `MiniBuilder` and `MiniProvider` do not silently become global owners.
+- **The widget tree defines scope**: a provider is visible only in its subtree, so the scope can be reviewed from the composition root instead of inferred from a global registry.
+- **Refresh intent is visible**: `update()` means a full refresh, while `update([id])` names the specific refresh region.
+- **Dependencies form a managed graph**: workers declare edges between controllers, reject circular registration, coalesce batched changes, and clean up with their owner.
+- **Flutter primitives first**: the package builds on `InheritedWidget`, `ChangeNotifier`, and normal widget lifecycle rules instead of replacing the application composition model.
+
+## Why Use mini_builder Instead of Common GetX Service-Locator Usage?
+
+GetX supports many application styles. The comparison below is about the common `Get.put` / `Get.find` / `tag` style, not a claim that every GetX project has the same structure.
+
+| Concern | Common service-locator usage | `mini_builder` |
+| --- | --- | --- |
+| Dependency access | A controller looks up another object by type or tag | Dependencies are constructor parameters; app-wide values are provided by `MiniProvider` |
+| Instance identity | Registry entries and tags must remain unique and correctly scoped | The object reference and Flutter widget identity define the instance; `ValueKey` handles same-slot identity changes |
+| Lifetime | A global or route manager may outlive the screen that needed it | The creating widget or feature owns `dispose()` explicitly |
+| Rebuild scope | Reactive dependencies can be discovered implicitly | `MiniBuilder`, `id`, and `shouldRebuild` make the rebuild boundary visible |
+| Cross-controller updates | Lookup and notification relationships can be spread across files | `watch` and `watchAll` declare dependency edges and detect cycles |
+| Testing | Tests may need to reset a global registry or tags | Controllers can be instantiated directly and passed to the widget under test |
+
+This design avoids several recurring classes of bugs: hidden dependencies that are difficult to replace in tests, tag collisions, global instances that outlive their screen, accidental broad rebuilds, circular synchronous updates, and worker timers that survive their owner. A late async response still requires a `closed` check before touching resources released in `onClose`; `update()` itself is a safe no-op after disposal.
+
+The tradeoff is intentional: `mini_builder` provides fewer global conveniences and asks the composition root to be explicit. GetX remains a reasonable choice when an application wants a larger integrated framework with service location, routing, and other global facilities.
 
 ## Installation
 
@@ -473,7 +503,7 @@ class CheckoutController extends MiniNotifier {
 
 **Performance guidance**: Keep the number of workers per controller reasonable (typically under 10 direct dependencies). For complex dependency graphs, consider introducing an intermediate coordinator controller rather than creating deep chains. A full `update()` has no declared ids, so it matches every id-filtered worker. The framework also limits nested dispatch depth and batch flush iterations to prevent an invalid re-entrant update from exhausting the call stack or event loop.
 
-See the runnable UI example in [`example/lib/ex/dependency_worker_example.dart`](example/lib/ex/dependency_worker_example.dart) and its verification in [`example/test/dependency_worker_example_test.dart`](example/test/dependency_worker_example_test.dart). It demonstrates root `MiniProvider`, constructor injection, `watchAll`, and `Mini.batch()`.
+See the runnable UI example in [`example/lib/features/dependency/dependency_worker_example.dart`](example/lib/features/dependency/dependency_worker_example.dart) and its verification in [`example/test/dependency_worker_example_test.dart`](example/test/dependency_worker_example_test.dart). It demonstrates root `MiniProvider`, constructor injection, `watchAll`, and `Mini.batch()`.
 
 Refresh ids remain `String` values. Define them in one place to avoid project-wide string collisions:
 
@@ -674,9 +704,9 @@ Tests for the safe and unsafe paths are in [`test/async_disposal_resource_test.d
 
 `onReady()` remains appropriate for logic that depends on the first rendered frame. Regular API requests do not need to be delayed until `onReady()` just to refresh the UI.
 
-See [`example/lib/on_init_api_example.dart`](example/lib/on_init_api_example.dart) for a runnable example and [`example/test/on_init_api_example_test.dart`](example/test/on_init_api_example_test.dart) for its verification. The example nests `MiniBuilder`s backed by two different controllers. Their subscriptions and notifications are independent, but rebuilding the outer builder still rebuilds its subtree according to Flutter's widget-tree rules.
+See [`example/lib/features/lifecycle/on_init_api_example.dart`](example/lib/features/lifecycle/on_init_api_example.dart) for a runnable example and [`example/test/on_init_api_example_test.dart`](example/test/on_init_api_example_test.dart) for its verification. The example nests `MiniBuilder`s backed by two different controllers. Their subscriptions and notifications are independent, but rebuilding the outer builder still rebuilds its subtree according to Flutter's widget-tree rules.
 
-The example uses [`ExampleLogManager`](example/lib/example_log_manager.dart) for structured debug logs covering request start, success or failure, elapsed time, state updates, and builder rebuild counts. It does not log API payloads or exception messages. Logging is disabled in release mode by default. Enterprise applications should connect an approved sink through `configure()` and apply their environment's redaction and retention policies.
+The example uses [`ExampleLogManager`](example/lib/shared/example_log_manager.dart) for structured debug logs covering request start, success or failure, elapsed time, state updates, and builder rebuild counts. It does not log API payloads or exception messages. Logging is disabled in release mode by default. Enterprise applications should connect an approved sink through `configure()` and apply their environment's redaction and retention policies.
 
 Run the Android example from the `example` directory with `flutter run -d <device-id>`. The generated Android host currently uses a sample application ID and debug signing and is intended only for functional verification. Replace the package name, signing configuration, and CI secret-management setup before an enterprise release.
 

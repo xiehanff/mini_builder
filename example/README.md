@@ -9,16 +9,27 @@
    - 按 id 的局部刷新
    - `shouldRebuild` 条件重建
 
-2. **跨 Controller 依赖**（`ex/dependency_worker_example.dart`）
+2. **跨 Controller 依赖**（`lib/features/dependency/dependency_worker_example.dart`）
    - 根部 `MiniProvider` 注入应用依赖
    - 构造函数显式注入
    - `watchAll` 监听多个依赖
    - `Mini.batch()` 批量更新
 
-3. **onInit 异步请求**（`ex/on_init_api_example.dart`）
+3. **onInit 异步请求**（`lib/features/lifecycle/on_init_api_example.dart`）
    - 在 `onInit()` 中请求 API
    - 嵌套 controller 的生命周期
    - 异常处理和状态更新
+
+## 目录结构
+
+- `lib/main.dart`：应用启动入口，仅负责启动日志和 `runApp`
+- `lib/app/`：应用根组件和全局依赖组合
+- `lib/features/home/`：示例首页和页面组合
+- `lib/features/counter/`：细粒度刷新 controller
+- `lib/features/product/`：商品详情 controller 和页面
+- `lib/features/dependency/`：跨 controller 依赖示例
+- `lib/features/lifecycle/`：`onInit` 异步请求示例
+- `lib/shared/`：示例共享基础设施，例如结构化日志
 
 ## 运行示例
 
