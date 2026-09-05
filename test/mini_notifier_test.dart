@@ -127,7 +127,7 @@ void main() {
     controller.dispose();
   });
 
-  test('update with empty ids does not notify listeners', () {
+  test('update with empty ids triggers assert in debug mode', () {
     final controller = _LifecycleController();
     var globalNotifyCount = 0;
     var redNotifyCount = 0;
@@ -139,7 +139,11 @@ void main() {
       redNotifyCount++;
     });
 
-    controller.update([]);
+    // 在 debug 模式下应该触发断言
+    expect(
+      () => controller.update([]),
+      throwsAssertionError,
+    );
 
     expect(globalNotifyCount, 0);
     expect(redNotifyCount, 0);

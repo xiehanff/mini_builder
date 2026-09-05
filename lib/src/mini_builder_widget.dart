@@ -67,7 +67,12 @@ class _MiniBuilderState<T extends MiniNotifier> extends State<MiniBuilder<T>> {
 
   void _scheduleReady(T controller) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || widget.controller != controller) return;
+      // 检查 widget 是否已卸载
+      if (!mounted) return;
+
+      // 检查 controller 是否已被切换（didUpdateWidget 场景）
+      // 如果不同，说明已经为新 controller 调度了新的 ready，避免对旧 controller 重复触发
+      if (widget.controller != controller) return;
 
       // onReady 只在 controller 挂到 MiniBuilder 且首帧绘制完成后触发。
       controller._ready();

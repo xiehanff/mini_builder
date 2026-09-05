@@ -13,8 +13,12 @@ class MiniNotifier extends ChangeNotifier {
   bool get closed => _closed;
 
   MiniNotifier() {
-    // 允许 controller 单独创建时也能自动初始化；
-    // MiniBuilder 也会再次调用 _ensureInitialized()，但这里靠 _initialized 保证幂等。
+    // 在 microtask 中调用 onInit，确保：
+    // 1. 构造函数体和初始化列表完全执行完毕
+    // 2. 子类构造函数中的字段赋值已完成
+    //
+    // 注意：不要在构造函数体中访问依赖 onInit 的字段，它们此时尚未初始化。
+    // MiniBuilder 也会调用 _ensureInitialized()，但 _initialized 标志保证幂等性。
     scheduleMicrotask(_ensureInitialized);
   }
 
@@ -69,9 +73,11 @@ class MiniNotifier extends ChangeNotifier {
   }
 
   /// 通知监听器，支持按 id 细粒度刷新。
-  /// - ids 为 null 时，通知全部监听器。
-  /// - ids 为空时，不通知任何监听器。
-  /// - ids 非空时，仅通知对应 id 的监听器。
+  ///
+  /// 调用方式：
+  /// - `update()` 或 `update(null)` - 全量刷新：通知全部普通监听器和所有 id 监听器
+  /// - `update([])` - 空列表不通知任何监听器（开发模式会触发断言提示）
+  /// - `update(['id1', 'id2'])` - 局部刷新：只通知指定 id 的监听器，不通知普通监听器
   void update([List<String>? ids]) {
     if (_closed) return;
 
@@ -81,7 +87,16 @@ class MiniNotifier extends ChangeNotifier {
       return;
     }
 
-    if (ids.isEmpty) return;
+    // 空列表不通知任何监听器
+    // 开发时帮助发现潜在的逻辑错误：业务代码通常不应该传空列表
+    if (ids.isEmpty) {
+      assert(
+        false,
+        'update([]) called with empty list. '
+        'Use update() for full refresh or update([id]) for specific ids.',
+      );
+      return;
+    }
 
     for (final id in ids) {
       _notifyIdListeners(id);

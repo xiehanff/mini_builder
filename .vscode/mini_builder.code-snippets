@@ -1,0 +1,78 @@
+{
+  "MiniNotifier Controller": {
+    "prefix": "minicontroller",
+    "body": [
+      "class ${1:My}Controller extends MiniNotifier {",
+      "  ${2:// State fields}",
+      "",
+      "  @override",
+      "  void onInit() {",
+      "    super.onInit();",
+      "    ${3:// Initialize}",
+      "  }",
+      "",
+      "  @override",
+      "  void onReady() {",
+      "    super.onReady();",
+      "    ${4:// Post-frame logic}",
+      "  }",
+      "",
+      "  @override",
+      "  void onClose() {",
+      "    ${5:// Cleanup resources}",
+      "    super.onClose();",
+      "  }",
+      "}"
+    ],
+    "description": "Create a MiniNotifier controller"
+  },
+  "MiniBuilder Widget": {
+    "prefix": "minibuilder",
+    "body": [
+      "MiniBuilder<${1:Controller}>(",
+      "  controller: ${2:controller},",
+      "  ${3:id: '${4:id}',}",
+      "  builder: (context, controller) {",
+      "    return ${5:Widget}();",
+      "  },",
+      ")"
+    ],
+    "description": "Create a MiniBuilder widget"
+  },
+  "StatefulWidget with Controller": {
+    "prefix": "minipage",
+    "body": [
+      "class ${1:My}Page extends StatefulWidget {",
+      "  const ${1:My}Page({super.key});",
+      "",
+      "  @override",
+      "  State<${1:My}Page> createState() => _${1:My}PageState();",
+      "}",
+      "",
+      "class _${1:My}PageState extends State<${1:My}Page> {",
+      "  late final ${2:Controller} controller;",
+      "",
+      "  @override",
+      "  void initState() {",
+      "    super.initState();",
+      "    controller = ${2:Controller}();",
+      "  }",
+      "",
+      "  @override",
+      "  void dispose() {",
+      "    controller.dispose();",
+      "    super.dispose();",
+      "  }",
+      "",
+      "  @override",
+      "  Widget build(BuildContext context) {",
+      "    return MiniProvider<${2:Controller}>(",
+      "      controller: controller,",
+      "      child: ${3:Widget}(),",
+      "    );",
+      "  }",
+      "}"
+    ],
+    "description": "Create a StatefulWidget with MiniNotifier controller"
+  }
+}

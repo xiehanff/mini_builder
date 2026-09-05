@@ -1,6 +1,6 @@
 # mini_builder
 
-[`中文文档`](./README_zh.md)
+[`中文文档`](./README_CN.md)
 
 `mini_builder` is a lightweight Flutter state refresh utility, suitable for page-level controllers, partial refreshes, and deep controller injection.
 
@@ -184,6 +184,75 @@ Note:
 - It is suitable for simple conditions, such as rebuilding only on even numbers, specific tabs, or when data is ready.
 - If you need complex diffing, maintain explicit fields within the controller.
 
+### Advanced: Comparing Previous and Current Values
+
+If you need to compare previous and current values, maintain state history in the controller:
+
+```dart
+class ProductController extends MiniNotifier {
+  int _price = 0;
+  int _previousPrice = 0;
+
+  int get price => _price;
+  bool get priceChanged => _price != _previousPrice;
+
+  void updatePrice(int newPrice) {
+    _previousPrice = _price;
+    _price = newPrice;
+    update();
+  }
+}
+
+// Use in MiniBuilder
+MiniBuilder<ProductController>(
+  controller: controller,
+  shouldRebuild: (controller) => controller.priceChanged,
+  builder: (context, controller) {
+    return Text('Price: ${controller.price}');
+  },
+)
+```
+
+Or use value objects to encapsulate state:
+
+```dart
+class ProductState {
+  final int price;
+  final String name;
+
+  const ProductState({required this.price, required this.name});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProductState && price == other.price && name == other.name;
+
+  @override
+  int get hashCode => Object.hash(price, name);
+}
+
+class ProductController extends MiniNotifier {
+  ProductState _state = const ProductState(price: 0, name: '');
+  ProductState _previousState = const ProductState(price: 0, name: '');
+
+  ProductState get state => _state;
+
+  void updateState(ProductState newState) {
+    _previousState = _state;
+    _state = newState;
+    update();
+  }
+}
+
+MiniBuilder<ProductController>(
+  controller: controller,
+  shouldRebuild: (controller) => controller.state != controller._previousState,
+  builder: (context, controller) {
+    return Text('${controller.state.name}: ${controller.state.price}');
+  },
+)
+```
+
 ## MiniProvider Deep Injection
 
 When a leaf node needs access to a controller, without `MiniProvider` you must pass it through every layer of constructor parameters:
@@ -364,6 +433,161 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 ```
 
 The old page and new page are in different route subtrees, so controllers of the same type will not override each other.
+
+## Common Pitfalls
+
+### ❌ Creating a controller in build
+
+Every rebuild creates a new instance, causing state loss and listener leaks:
+
+```dart
+// ❌ Wrong
+@override
+Widget build(BuildContext context) {
+  final controller = OrderController();  // new instance on every rebuild
+  return MiniBuilder<OrderController>(controller: controller, ...);
+}
+```
+
+```dart
+// ✅ Correct: create in StatefulWidget's createState
+late final OrderController controller;
+
+@override
+void initState() {
+  super.initState();
+  controller = OrderController();
+}
+
+@override
+void dispose() {
+  controller.dispose();
+  super.dispose();
+}
+```
+
+### ❌ Controller holding BuildContext
+
+Holding `BuildContext` may cause memory leaks and lifecycle issues:
+
+```dart
+// ❌ Wrong
+class OrderController extends MiniNotifier {
+  BuildContext context;  // don't do this
+
+  void load() {
+    Navigator.of(context).push(...);  // dangerous
+  }
+}
+```
+
+```dart
+// ✅ Correct: handle Context-dependent operations in the Widget layer
+class OrderPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MiniBuilder<OrderController>(
+      controller: controller,
+      builder: (_, controller) {
+        return ElevatedButton(
+          onPressed: () => Navigator.of(context).push(...),
+          child: const Text('Next'),
+        );
+      },
+    );
+  }
+}
+```
+
+### ❌ Calling update to notify UI in onInit
+
+`onInit()` fires right after construction, before `MiniBuilder` has subscribed — `update()` produces no refresh:
+
+```dart
+// ❌ Wrong
+class OrderController extends MiniNotifier {
+  @override
+  void onInit() {
+    super.onInit();
+    loadOrder();  // if this calls update(), UI won't refresh
+  }
+}
+```
+
+```dart
+// ✅ Correct: notify UI in onReady
+class OrderController extends MiniNotifier {
+  @override
+  void onInit() {
+    super.onInit();
+    loadOrder();  // start request
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    // After the first frame MiniBuilder is subscribed; update() works correctly
+  }
+}
+```
+
+### ❌ Using MiniProvider for cross-route global sharing
+
+`MiniProvider` injects into the widget subtree, not a global singleton. For cross-route sharing, use a global controller or state management solution:
+
+```dart
+// ❌ Wrong: expecting another route's page to read via MiniProvider.of
+Navigator.of(context).push(
+  MaterialPageRoute(builder: (_) => const AnotherPage()),
+);
+// AnotherPage won't find MiniProvider.of<T>(context)
+```
+
+```dart
+// ✅ Correct: each route needs its own controller instance
+class AnotherPage extends StatefulWidget {
+  @override
+  State<AnotherPage> createState() => _AnotherPageState();
+}
+
+class _AnotherPageState extends State<AnotherPage> {
+  late final controller = OrderController();
+  // ...
+}
+```
+
+## FAQ
+
+**Q: Why doesn't `update()` in `onInit` refresh the UI?**
+
+A: `onInit` is triggered immediately after construction, before `MiniBuilder` subscribes. Call `update()` in `onReady`, or directly after async operations complete.
+
+---
+
+**Q: What's the difference between `update([])` and `update()`?**
+
+A:
+- `update()` - Full refresh: notifies all listeners (global and all id listeners)
+- `update([])` - Empty list notifies no listeners (triggers assertion in debug mode; usually a logic error)
+- `update(['id'])` - Partial refresh: only notifies specified id listeners
+
+---
+
+**Q: Can I use MiniNotifier in a global singleton?**
+
+A: Yes, but you must manually manage its lifecycle. MiniNotifier is better suited for page-level controllers. For global state, consider Provider or other global state management solutions.
+
+---
+
+**Q: Does MiniBuilder automatically dispose the controller?**
+
+A: No. Controller creation and disposal are the responsibility of the business layer (typically StatefulWidget). MiniBuilder only subscribes; it doesn't own the controller.
+
+---
+
+**Q: Can I use multiple MiniBuilders with the same controller?**
+
+A: Yes. Multiple MiniBuilders can subscribe to the same controller. `onReady()` will only be called once after the first frame, regardless of how many MiniBuilders are attached.
 
 ## Common Pitfalls
 
