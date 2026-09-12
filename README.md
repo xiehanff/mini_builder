@@ -1,6 +1,6 @@
 # mini_builder
 
-[`中文文档`](./README_CN.md)
+[`中文文档`](./README_zh.md)
 
 `mini_builder` is a lightweight Flutter state refresh utility, suitable for page-level controllers, partial refreshes, and deep controller injection.
 
