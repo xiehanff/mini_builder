@@ -1,13 +1,44 @@
 # mini_builder
 
+面向编码代理的快速接入说明见 [Agent Quickstart](./docs/agent_quickstart.md)。
+
 `mini_builder` 是一个轻量 Flutter 状态刷新工具，适合页面级 controller、局部刷新和深层 controller 注入。
 
 ## 特性
 
 - `MiniNotifier`：controller 基类，提供生命周期、全量刷新和按 id 局部刷新。
 - `MiniBuilder`：订阅 controller，并按需重建当前 Widget，支持 `id` 和 `shouldRebuild`。
-- `MiniProvider`：把 controller 注入到子树，避免层层传参。
+- `MiniProvider`：把 controller 或应用依赖注入子树，避免层层传参和 `put/find` 式全局查找。
+- `watch`、`watchAll`、`debounce`、`interval`：声明 controller 间依赖，并在持有方销毁时自动取消订阅。
 - 适合页面级状态、局部刷新和深层 controller 共享。
+
+## 设计哲学
+
+`mini_builder` 把状态看作同时具有持有者、作用域和通知边界的对象：
+
+- **显式依赖优先于隐式查找**：controller 之间通过构造函数传递依赖；`MiniProvider<T>(value: ..., child: ...)` 只用于组合边界。
+- **持有者负责生命周期**：创建 controller 的 widget 或 feature 负责 `dispose()`；`MiniBuilder` 和 `MiniProvider` 不会暗中接管全局生命周期。
+- **Widget 树定义作用域**：Provider 只在自己的子树可见，依赖范围可以从组合根直接审查，不需要猜测全局注册表状态。
+- **刷新意图可见**：`update()` 表示全量刷新，`update([id])` 明确指定刷新区域。
+- **依赖关系形成受管理的图**：worker 声明 controller 之间的边，注册时拒绝循环依赖，批量更新时合并变更，并随持有者自动清理。
+- **优先使用 Flutter 原语**：基于 `InheritedWidget`、`ChangeNotifier` 和正常的 Widget 生命周期工作，不替换应用本身的组合模型。
+
+## 相比常见 GetX 服务定位器用法的优势
+
+GetX 支持多种应用组织方式。下面比较的是常见的 `Get.put` / `Get.find` / `tag` 用法，不代表所有 GetX 项目都采用相同结构。
+
+| 关注点 | 常见服务定位器用法 | `mini_builder` |
+| --- | --- | --- |
+| 依赖访问 | controller 按类型或 tag 查找对象 | 依赖通过构造函数传入；应用级对象由 `MiniProvider` 提供 |
+| 实例身份 | 依赖注册表和 tag 保持唯一并正确管理作用域 | 对象引用和 Flutter Widget 身份决定实例；同一位置切换对象时使用 `ValueKey` |
+| 生命周期 | 全局或路由管理器可能让对象超出页面生命周期 | 创建对象的 widget 或 feature 明确负责 `dispose()` |
+| 刷新范围 | 响应式依赖可能被隐式发现 | `MiniBuilder`、`id` 和 `shouldRebuild` 明确重建边界 |
+| Controller 联动 | 查找关系和通知关系可能分散在多个文件 | `watch`、`watchAll` 声明依赖边，并检测循环依赖 |
+| 测试替换 | 测试通常需要重置全局注册表或 tag | controller 可以直接创建并注入测试 Widget |
+
+这种设计重点避免几类常见问题：测试中难以替换的隐式依赖、tag 冲突、超出页面生命周期的全局实例、意外的全量重建、循环同步更新，以及 owner 销毁后仍然存活的 worker 和定时器。异步请求晚返回时，业务代码仍需在访问 `onClose()` 释放的资源前检查 `closed`；但 `update()` 在销毁后会安全地变成空操作。
+
+这个取舍是有意的：`mini_builder` 减少全局便利 API，要求组合根明确表达依赖。需要服务定位、路由和更多全局设施的一体化框架时，GetX 仍然是合理选择。
 
 ## 安装
 
@@ -257,7 +288,7 @@ class OrderFooter extends StatelessWidget {
 
 ```dart
 MiniProvider<ProductController>(
-  controller: controller,
+  value: controller,
   child: const ProductDetailView(),
 )
 ```
@@ -280,9 +311,9 @@ final controller = MiniProvider.maybeOf<ProductController>(context);
 
 ```dart
 MiniProvider<UserController>(
-  controller: userController,
+  value: userController,
   child: MiniProvider<CartController>(
-    controller: cartController,
+    value: cartController,
     child: const PageContent(),
   ),
 )
@@ -299,15 +330,118 @@ final cart = MiniProvider.of<CartController>(context);
 
 ```dart
 MiniProvider<ProductController>(
-  controller: outer,
+  value: outer,
   child: MiniProvider<ProductController>(
-    controller: inner,
+    value: inner,
     child: const ProductPanel(),
   ),
 )
 ```
 
 `ProductPanel` 读取到的是 `inner`。如果同一棵子树需要两个同类型 controller，优先改成不同 controller 类型，或显式通过构造参数传入，不建议提前引入 tag 机制。
+
+## 跨 Controller 依赖与全局状态
+
+本库不提供 `put` / `find` 形式的全局服务定位器。全局状态在应用组合根创建一次，通过 `MiniProvider` 提供给路由；controller 之间通过构造函数显式注入依赖。以下为组合方式示意。
+
+```dart
+class AppServices {
+  AppServices({required this.auth, required this.cart});
+
+  final AuthController auth;
+  final CartController cart;
+
+  void dispose() {
+    auth.dispose();
+    cart.dispose();
+  }
+}
+
+class App extends StatefulWidget {
+  const App({super.key});
+
+  @override
+  State<App> createState() => _AppState();
+}
+
+class _AppState extends State<App> {
+  late final services = AppServices(
+    auth: AuthController(),
+    cart: CartController(),
+  );
+
+  @override
+  void dispose() {
+    services.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MiniProvider<AppServices>(
+      value: services,
+      child: const MaterialApp(home: HomePage()),
+    );
+  }
+}
+```
+
+路由入口读取一次依赖，再把它们传给页面；页面仍负责创建和销毁自己的 controller：
+
+```dart
+class CheckoutEntry extends StatelessWidget {
+  const CheckoutEntry({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = MiniProvider.of<AppServices>(context);
+    return CheckoutPage(auth: app.auth, cart: app.cart);
+  }
+}
+
+class CheckoutController extends MiniNotifier {
+  CheckoutController({
+    required AuthController auth,
+    required CartController cart,
+  })  : _auth = auth,
+        _cart = cart;
+
+  final AuthController _auth;
+  final CartController _cart;
+
+  @override
+  void onInit() {
+    super.onInit();
+    watchAll(
+      [
+        MiniWatchSource(_auth, ids: [AuthIds.session]),
+        MiniWatchSource(_cart, ids: [CartIds.items]),
+      ],
+      onChanged: (_) => refreshQuote(),
+    );
+  }
+}
+```
+
+`watch` 仅监听一个 source；`watchAll` 默认把同一同步调用栈里的多个变更合并为一次回调。`debounce` 和 `interval` 分别用于防抖和节流。它们都会由当前 controller 自动管理，在 `dispose()` 后取消订阅和计时器。`Mini.batch(() { ... })` 会合并同一个 controller 在一轮业务操作内的多次 `update()`，使 UI 和依赖 controller 各收到一次合并后的变更。Worker 注册时会拒绝循环依赖；回调异常会通过 Flutter 错误报告机制上报，不会让 `interval` 停留在节流状态。
+
+**性能指导**：单个 controller 的 worker 数量应保持适度（通常不超过 10 个直接依赖）。对于复杂的依赖图，考虑引入中间协调器 controller，而不是创建过深的依赖链。全量 `update()` 未声明变更 id，因此会触发所有按 id 订阅的 Worker；框架还会限制嵌套派发深度和 batch flush 轮数，防止错误的重入更新耗尽调用栈或事件循环。
+
+可运行的界面示例见 [`example/lib/features/dependency/dependency_worker_example.dart`](example/lib/features/dependency/dependency_worker_example.dart)，对应验证见 [`example/test/dependency_worker_example_test.dart`](example/test/dependency_worker_example_test.dart)。它演示根部 `MiniProvider`、构造函数注入、`watchAll` 和 `Mini.batch()`。
+
+刷新 id 保持 `String`，推荐用集中定义的常量避免字符串冲突：
+
+```dart
+abstract final class CartIds {
+  static const items = 'cart.items';
+  static const summary = 'cart.summary';
+}
+
+void add(Product product) {
+  cart = cart.add(product);
+  update([CartIds.items, CartIds.summary]);
+}
+```
 
 ## 商品详情页场景
 
@@ -354,7 +488,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   @override
   Widget build(BuildContext context) {
     return MiniProvider<ProductController>(
-      controller: controller,
+      value: controller,
       child: const ProductDetailView(),
     );
   }
@@ -494,22 +628,22 @@ void onClose() {
 
 `onReady()` 仍适合依赖首帧渲染结果的逻辑，不需要为了刷新页面把普通 API 请求延后到 `onReady()`。
 
-可运行示例见 [`example/lib/on_init_api_example.dart`](example/lib/on_init_api_example.dart)，对应验证见 [`example/test/on_init_api_example_test.dart`](example/test/on_init_api_example_test.dart)。示例包含两个不同 controller 的嵌套 `MiniBuilder`。两个 controller 的订阅和通知彼此独立，但外层 Builder 重建时，内层仍会遵循 Flutter 的子树重建规则。
+可运行示例见 [`example/lib/features/lifecycle/on_init_api_example.dart`](example/lib/features/lifecycle/on_init_api_example.dart)，对应验证见 [`example/test/on_init_api_example_test.dart`](example/test/on_init_api_example_test.dart)。示例包含两个不同 controller 的嵌套 `MiniBuilder`。两个 controller 的订阅和通知彼此独立，但外层 Builder 重建时，内层仍会遵循 Flutter 的子树重建规则。
 
-example 通过 [`ExampleLogManager`](example/lib/example_log_manager.dart) 输出结构化调试日志，包括请求开始、成功或失败、耗时、状态刷新和 Builder 重建次数。日志不记录 API 返回内容和异常消息。默认只在非 release 模式输出；企业应用应通过 `configure()` 接入经过审批的日志采集器，并按所在环境的脱敏和留存策略处理。
+example 通过 [`ExampleLogManager`](example/lib/shared/example_log_manager.dart) 输出结构化调试日志，包括请求开始、成功或失败、耗时、状态刷新和 Builder 重建次数。日志不记录 API 返回内容和异常消息。默认只在非 release 模式输出；企业应用应通过 `configure()` 接入经过审批的日志采集器，并按所在环境的脱敏和留存策略处理。
 
 Android 示例可在 `example` 目录执行 `flutter run -d <device-id>` 启动。当前 Android 宿主使用示例 applicationId 和 debug 签名，仅用于功能验证；接入企业发布流程前必须替换为正式包名、签名配置和对应的 CI 密钥管理方案。
 
-### ❌ 用 MiniProvider 做跨路由全局共享
+### 页面 MiniProvider 不会跨路由
 
-`MiniProvider` 注入的是 widget 子树，不是全局单例。跨路由共享应使用全局 controller 或状态管理方案：
+页面根部的 `MiniProvider` 只覆盖该页面子树，新路由不能读取它。应用级依赖应由根部 `MiniProvider` 包住 `MaterialApp`；新路由仍自行创建和释放页面 controller：
 
 ```dart
-// ❌ 错误：期望另一个路由的页面能通过 MiniProvider.of 读取到
+// ❌ 页面 MiniProvider 无法提供给新路由
 Navigator.of(context).push(
   MaterialPageRoute(builder: (_) => const AnotherPage()),
 );
-// AnotherPage 中 MiniProvider.of<T>(context) 找不到
+// AnotherPage 中 MiniProvider.of<T>(context) 找不到页面私有 controller
 ```
 
 ```dart
@@ -537,9 +671,9 @@ class _AnotherPageState extends State<AnotherPage> {
 
 不负责：
 
-- 自动依赖注入。
+- 自动依赖注入或 `put/find` 式服务定位。
 - 自动创建和销毁 controller。
-- 全局状态管理。
+- 全局状态的自动注册和自动生命周期管理；应用根需显式持有并释放它。
 - 路由守卫和中间件。
 - 副作用队列。
 - 数据缓存同步和离线策略。
